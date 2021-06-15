@@ -23,7 +23,7 @@
     3. This notice may not be removed or altered from any source distribution.
 */
 
-#include "MasterSystem.h"
+#include "MasterSystem.hpp"
 
 int main (int argsc, char** argsv)
 {

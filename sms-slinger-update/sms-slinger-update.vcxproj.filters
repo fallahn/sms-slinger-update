@@ -15,37 +15,37 @@
     </Filter>
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="src\Config.h">
+    <ClInclude Include="src\Config.hpp">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="src\Emulator.h">
+    <ClInclude Include="src\Emulator.hpp">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="src\GameSettings.h">
+    <ClInclude Include="src\GameSettings.hpp">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="src\LogMessages.h">
+    <ClInclude Include="src\LogMessages.hpp">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="src\MasterSystem.h">
+    <ClInclude Include="src\MasterSystem.hpp">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="src\SN79489.h">
+    <ClInclude Include="src\SN79489.hpp">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="src\TMS9918A.h">
+    <ClInclude Include="src\TMS9918A.hpp">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="src\useful_utils.h">
+    <ClInclude Include="src\useful_utils.hpp">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="src\Z80.h">
+    <ClInclude Include="src\Z80.hpp">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="src\Z80.Mnemonics.h">
+    <ClInclude Include="src\Z80.Mnemonics.hpp">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="src\Z80.Opcodes.h">
+    <ClInclude Include="src\Z80.Opcodes.hpp">
       <Filter>Header Files</Filter>
     </ClInclude>
   </ItemGroup>

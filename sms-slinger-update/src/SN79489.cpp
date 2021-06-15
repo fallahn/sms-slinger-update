@@ -23,10 +23,10 @@
     3. This notice may not be removed or altered from any source distribution.
 */
 
-#include "Config.h"
-#include "SN79489.h"
-#include "LogMessages.h"
-#include "Emulator.h"
+#include "Config.hpp"
+#include "SN79489.hpp"
+#include "LogMessages.hpp"
+#include "Emulator.hpp"
 
 #include <cmath>
 #include <cstring>

@@ -23,9 +23,9 @@
     3. This notice may not be removed or altered from any source distribution.
 */
 
-#include "GameSettings.h"
-#include "LogMessages.h"
-#include "useful_utils.h"
+#include "GameSettings.hpp"
+#include "LogMessages.hpp"
+#include "useful_utils.hpp"
 
 #include <cassert>
 #include <fstream>

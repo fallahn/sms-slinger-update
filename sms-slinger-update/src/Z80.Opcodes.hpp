@@ -25,8 +25,8 @@
 
 #pragma once
 
-#include "Config.h"
-#include "Z80.h"
+#include "Config.hpp"
+#include "Z80.hpp"
 
 
 // load immediate byte into reg

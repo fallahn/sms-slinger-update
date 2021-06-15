@@ -23,9 +23,9 @@
     3. This notice may not be removed or altered from any source distribution.
 */
 
-#include "Config.h"
-#include "TMS9918A.h"
-#include "LogMessages.h"
+#include "Config.hpp"
+#include "TMS9918A.hpp"
+#include "LogMessages.hpp"
 
 #include <cassert>
 #include <cmath>

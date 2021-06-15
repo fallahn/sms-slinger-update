@@ -23,9 +23,9 @@
     3. This notice may not be removed or altered from any source distribution.
 */
 
-#include "Config.h"
-#include "Emulator.h"
-#include "LogMessages.h"
+#include "Config.hpp"
+#include "Emulator.hpp"
+#include "LogMessages.hpp"
 
 #include <memory.h>
 #include <cstdio>

@@ -23,8 +23,8 @@
     3. This notice may not be removed or altered from any source distribution.
 */
 
-#include "Config.h"
-#include "LogMessages.h"
+#include "Config.hpp"
+#include "LogMessages.hpp"
 
 #include <cassert>
 #include <cstdio>

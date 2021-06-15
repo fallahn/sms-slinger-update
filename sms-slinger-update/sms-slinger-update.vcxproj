@@ -143,17 +143,17 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
-    <ClInclude Include="src\Config.h" />
-    <ClInclude Include="src\Emulator.h" />
-    <ClInclude Include="src\GameSettings.h" />
-    <ClInclude Include="src\LogMessages.h" />
-    <ClInclude Include="src\MasterSystem.h" />
-    <ClInclude Include="src\SN79489.h" />
-    <ClInclude Include="src\TMS9918A.h" />
-    <ClInclude Include="src\useful_utils.h" />
-    <ClInclude Include="src\Z80.h" />
-    <ClInclude Include="src\Z80.Mnemonics.h" />
-    <ClInclude Include="src\Z80.Opcodes.h" />
+    <ClInclude Include="src\Config.hpp" />
+    <ClInclude Include="src\Emulator.hpp" />
+    <ClInclude Include="src\GameSettings.hpp" />
+    <ClInclude Include="src\LogMessages.hpp" />
+    <ClInclude Include="src\MasterSystem.hpp" />
+    <ClInclude Include="src\SN79489.hpp" />
+    <ClInclude Include="src\TMS9918A.hpp" />
+    <ClInclude Include="src\useful_utils.hpp" />
+    <ClInclude Include="src\Z80.hpp" />
+    <ClInclude Include="src\Z80.Mnemonics.hpp" />
+    <ClInclude Include="src\Z80.Opcodes.hpp" />
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="src\Emulator.cpp" />

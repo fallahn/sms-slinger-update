@@ -23,10 +23,10 @@
     3. This notice may not be removed or altered from any source distribution.
 */
 
-#include "Config.h"
-#include "MasterSystem.h"
-#include "Emulator.h"
-#include "TMS9918A.h"
+#include "Config.hpp"
+#include "MasterSystem.hpp"
+#include "Emulator.hpp"
+#include "TMS9918A.hpp"
 
 namespace
 {

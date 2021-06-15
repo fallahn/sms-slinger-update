@@ -25,9 +25,9 @@
 
 #pragma once
 
-#include "Z80.h"
-#include "TMS9918A.h"
-#include "SN79489.h"
+#include "Z80.hpp"
+#include "TMS9918A.hpp"
+#include "SN79489.hpp"
 
 #include <memory>
 

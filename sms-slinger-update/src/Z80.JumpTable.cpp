@@ -23,10 +23,10 @@
     3. This notice may not be removed or altered from any source distribution.
 */
 
-#include "Config.h"
-#include "Z80.h"
-#include "Z80.Opcodes.h"
-#include "LogMessages.h"
+#include "Config.hpp"
+#include "Z80.hpp"
+#include "Z80.Opcodes.hpp"
+#include "LogMessages.hpp"
 
 #include <cassert>
 #include <cstdio>
