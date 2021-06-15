@@ -27,7 +27,6 @@
 #include "TMS9918A.h"
 #include "LogMessages.h"
 
-#include <memory.h>
 #include <cassert>
 #include <cmath>
 #include <fstream>

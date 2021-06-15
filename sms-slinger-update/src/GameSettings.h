@@ -27,24 +27,23 @@
 
 #include <map>
 #include <string>
+#include <memory>
 
 class GameSettings
 {
 public:
+                            GameSettings();
+
     static  GameSettings*   CreateInstance();
     static  GameSettings*   GetSingleton();
 
             bool            LoadSettings();
 
-            std::string     GetSetting(const std::string setting) const;
+            std::string     GetSetting(const std::string& setting) const;
 
-                            ~GameSettings();
 private:
-                            GameSettings();
-
-    static  GameSettings*   m_Instance;
+    static  std::unique_ptr<GameSettings> m_Instance;
 
     typedef std::map<std::string, std::string> GAMESETTINGS;
     GAMESETTINGS m_Settings;
-
 };

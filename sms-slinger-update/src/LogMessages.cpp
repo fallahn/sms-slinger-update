@@ -32,23 +32,23 @@
 
 ////////////////////////////////////////////////////////////////////////////////////////
 
-LogMessage* LogMessage::m_Instance = nullptr;
+std::unique_ptr<LogMessage> LogMessage::m_Instance;
 
 LogMessage* LogMessage::CreateInstance()
 {
     if (m_Instance == nullptr)
     {
-        m_Instance = new LogMessage();
+        m_Instance = std::make_unique<LogMessage>();
     }
-    return m_Instance;
+    return m_Instance.get();
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////
 
 LogMessage* LogMessage::GetSingleton()
 {
-    assert(m_Instance != 0);
-    return m_Instance;
+    assert(m_Instance != nullptr);
+    return m_Instance.get();
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////

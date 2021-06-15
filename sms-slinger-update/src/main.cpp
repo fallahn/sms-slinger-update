@@ -27,13 +27,6 @@
 
 int main (int argsc, char** argsv)
 {
-    /*LogMessage* lm = LogMessage::CreateInstance( );
-    GameSettings* gs = GameSettings::CreateInstance( );
-    gs->LoadSettings( );*/
-
-    /*delete gs ;
-    delete lm ;*/
-
     MasterSystem* sms = MasterSystem::CreateInstance();
     sms->CreateSDLWindow();
     sms->StartRom("roms/lander2_v0C.sms");

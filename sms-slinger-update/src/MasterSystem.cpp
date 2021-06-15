@@ -37,15 +37,15 @@ namespace
 
 /////////////////////////////////////////////////////////////////////////
 
-MasterSystem* MasterSystem::m_Instance = nullptr;
+std::unique_ptr<MasterSystem> MasterSystem::m_Instance;
 
 MasterSystem* MasterSystem::CreateInstance()
 {
     if (m_Instance == nullptr)
     {
-        m_Instance = new MasterSystem();
+        m_Instance = std::make_unique<MasterSystem>();
     }
-    return m_Instance;
+    return m_Instance.get();
 }
 
 /////////////////////////////////////////////////////////////////////////
@@ -61,13 +61,6 @@ MasterSystem::MasterSystem()
 
 /////////////////////////////////////////////////////////////////////////
 
-MasterSystem::~MasterSystem()
-{
-    delete m_Emulator;
-}
-
-/////////////////////////////////////////////////////////////////////////
-
 bool MasterSystem::CreateSDLWindow()
 {
     m_Width = WINDOWWIDTH * SCREENSCALE;
@@ -76,14 +69,14 @@ bool MasterSystem::CreateSDLWindow()
     {
         return false;
     }
-    if(SDL_SetVideoMode(m_Width, m_Height, 8, SDL_OPENGL) == NULL)
+    if(SDL_SetVideoMode(m_Width, m_Height, 8, SDL_OPENGL) == nullptr)
     {
         return false;
     }
 
     InitGL();
 
-    SDL_WM_SetCaption("Sega Master System", NULL);
+    SDL_WM_SetCaption("Sega Master System", nullptr);
     return true;
 }
 
@@ -137,6 +130,7 @@ bool LogFrameRate()
         first = false;
         fpstime = SDL_GetTicks();
     }
+
     unsigned int fpscurrent = SDL_GetTicks();
     if((fpstime + 1000) < fpscurrent)
     {
@@ -144,7 +138,7 @@ bool LogFrameRate()
         char buffer[255];
         sprintf(buffer, "FPS %d", count);
         count = 0;
-        SDL_WM_SetCaption(buffer, NULL);
+        SDL_WM_SetCaption(buffer, nullptr);
         res = true;
     }
     count++;
@@ -236,7 +230,6 @@ void MasterSystem::RenderGame()
         
         SDL_GL_SwapBuffers();
     }
-
 }
 
 /////////////////////////////////////////////////////////////////////////
@@ -304,7 +297,6 @@ void MasterSystem::HandleInput(const SDL_Event& event)
             m_Emulator->SetKeyReleased(player,key);
         }
     }
-
 }
 
 /////////////////////////////////////////////////////////////////////////

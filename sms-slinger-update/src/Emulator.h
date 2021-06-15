@@ -29,9 +29,13 @@
 #include "TMS9918A.h"
 #include "SN79489.h"
 
+#include <memory>
+
 class Emulator
 {
 public:
+    Emulator();
+
     static  Emulator* CreateInstance();
     static  Emulator* GetSingleton();
 
@@ -53,12 +57,11 @@ public:
     void                CheckInterupts();
 
 
-    static       const  long long   MACHINE_CLICKS = 10738635;
-    static       const  int         CPU_CYCLES_TO_MACHINE_CLICKS = 3;
+    static   constexpr  long long   MACHINE_CLICKS = 10738635;
+    static   constexpr  int         CPU_CYCLES_TO_MACHINE_CLICKS = 3;
 
 private:
-    static      Emulator* m_Instance;
-    Emulator(void);
+    static      std::unique_ptr<Emulator> m_Instance;
 
     bool                IsPAL() const;
     bool                IsCodeMasters();

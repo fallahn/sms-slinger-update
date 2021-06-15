@@ -28,10 +28,14 @@
 #include <SDL/SDL.h>
 #include <SDL/SDL_opengl.h>
 
+#include <memory>
+
 class Emulator;
 class MasterSystem
 {
 public:
+                                MasterSystem();
+
     static  MasterSystem*       CreateInstance();
 
             bool                CreateSDLWindow();
@@ -40,9 +44,7 @@ public:
             void                BeginGame(int fps, bool useGfxOpt);
             unsigned char       GetMemoryByte(int i);
 
-            ~MasterSystem();
 private:
-                                MasterSystem();
 
             void                InitGL();
             void                RenderGame();
@@ -50,7 +52,7 @@ private:
             void                HandleInput(const SDL_Event& event);
             
 
-    static  MasterSystem*       m_Instance;
+    static  std::unique_ptr<MasterSystem>       m_Instance;
 
             Emulator*           m_Emulator;
             int                 m_Width;

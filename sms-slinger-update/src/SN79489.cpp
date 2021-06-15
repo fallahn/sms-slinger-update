@@ -43,8 +43,8 @@ SN79489::SN79489()
     m_BufferUpdateCount (0.f),
     m_UpdateBufferLimit (0.f)
 {
-    const int maxVolume = 8000; // there are 4 channels and the output is a signed 16 bit num giving a range of -32,000 + 32,000 so 4 * 8000 fits into the range
-    const double TwodBScalingFactor = 0.79432823; // each volume setting gets lower by 2 decibels
+    constexpr int maxVolume = 8000; // there are 4 channels and the output is a signed 16 bit num giving a range of -32,000 + 32,000 so 4 * 8000 fits into the range
+    constexpr double TwodBScalingFactor = 0.79432823; // each volume setting gets lower by 2 decibels
 
     double vol = maxVolume;
 
@@ -64,10 +64,10 @@ SN79489::SN79489()
     // add a new element to the playback buffer.
 
     // the amount of times that sdl will request the buffer to be filled up in a second
-    const float sdlCallbakFreq = (FREQUENCY / BUFFERSIZE) + 1;
+    constexpr float sdlCallbakFreq = (FREQUENCY / BUFFERSIZE) + 1;
 
     // the clockSpeed of the sound chip is 3.3Mhz / 16
-    const float clockSpeed = 220000;
+    constexpr float clockSpeed = 220000.f;
 
 
     float updateBufferLimit = clockSpeed / sdlCallbakFreq;
@@ -243,7 +243,7 @@ int parity (BYTE data)
 
 void SN79489::Update(float cyclesMac)
 {
-    const int sampleRate = 16;
+    constexpr int sampleRate = 16;
     cyclesMac /= sampleRate;
 
     m_Cycles += cyclesMac;

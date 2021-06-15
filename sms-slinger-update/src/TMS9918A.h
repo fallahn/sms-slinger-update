@@ -28,15 +28,15 @@
 class TMS9918A
 {
 public:
-    static const    int         NUM_RES_HORIZONTAL = 256;
-    static const    int         NUM_RES_VERTICAL = 192;
-    static const    int         NUM_NTSC_VERTICAL = 262;
-    static const    int         NUM_PAL_VERTICAL = 313;
-    static const    int         NUM_RES_VERT_MED = 224;
-    static const    int         NUM_RES_VERT_HIGH = 240;
-    static const    int         SCREENBLANKCOLOUR = 1;
+    static constexpr    int         NUM_RES_HORIZONTAL = 256;
+    static constexpr    int         NUM_RES_VERTICAL = 192;
+    static constexpr    int         NUM_NTSC_VERTICAL = 262;
+    static constexpr    int         NUM_PAL_VERTICAL = 313;
+    static constexpr    int         NUM_RES_VERT_MED = 224;
+    static constexpr    int         NUM_RES_VERT_HIGH = 240;
+    static constexpr    int         SCREENBLANKCOLOUR = 1;
 
-    static const    int         MACHINE_CLICKS_PER_SCANLINE = 684;
+    static constexpr    int         MACHINE_CLICKS_PER_SCANLINE = 684;
 
                                 TMS9918A();
 

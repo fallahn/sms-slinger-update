@@ -37,27 +37,27 @@
 
 ///////////////////////////////////////////////////////////////////////////////////
 
-Emulator* Emulator::m_Instance = nullptr;
+std::unique_ptr<Emulator> Emulator::m_Instance;
 
 Emulator* Emulator::CreateInstance()
 {
     if (m_Instance == nullptr)
     {
-        m_Instance = new Emulator();
+        m_Instance = std::make_unique<Emulator>();
     }
-    return m_Instance;
+    return m_Instance.get();
 }
 
 ///////////////////////////////////////////////////////////////////////////////////
 
 Emulator* Emulator::GetSingleton()
 {
-    if (0 == m_Instance)
+    if (m_Instance == nullptr)
     {
         LogMessage::GetSingleton()->DoLogMessage("Trying to get the singleton of Emulator when m_Instance is NULL", true);
         assert(false);
     }
-    return m_Instance;
+    return m_Instance.get();
 }
 
 ///////////////////////////////////////////////////////////////////////////////////
@@ -103,11 +103,12 @@ Emulator::Emulator()
 void Emulator::Reset()
 {
     m_ClockInfo = 0;
+
     CONTEXTZ80* context = m_Z80.GetContext();
-    memset(&context->m_CartridgeMemory,0,sizeof(context->m_CartridgeMemory));
-    memset(&context->m_InternalMemory,0,sizeof(context->m_InternalMemory));
+    std::memset(&context->m_CartridgeMemory,0,sizeof(context->m_CartridgeMemory));
+    std::memset(&context->m_InternalMemory,0,sizeof(context->m_InternalMemory));
    
-    memset(&m_RamBank,0, sizeof(m_RamBank));
+    std::memset(&m_RamBank,0, sizeof(m_RamBank));
 
     // these may have to be set to none 0 values so for now i'll set them to all
     // 0 instead of doing a memset so it becomes easier to edit later if necessary
@@ -157,7 +158,7 @@ void Emulator::InsertCartridge(const char* path)
 {
     CONTEXTZ80* context = m_Z80.GetContext();
 
-    FILE *in = NULL;
+    FILE *in = nullptr;
 
     // get the file size
     in = fopen(path, "rb");
@@ -188,7 +189,6 @@ void Emulator::InsertCartridge(const char* path)
     size_t size = fread(context->m_CartridgeMemory, 1, 0x100000, in);
     m_OneMegCartridge = (endPos > 0x80000)?true:false;
     
-
     std::memcpy(&context->m_InternalMemory[0x0], &context->m_CartridgeMemory[0x0], 0xC000);
 
     context->m_InternalMemory[0xFFFE] = 0x01;
@@ -200,7 +200,7 @@ void Emulator::InsertCartridge(const char* path)
 
     m_IsPAL = false;
     m_GraphicsChip.Reset(IsPAL());
-    m_FPS = IsPAL()?50:60;
+    m_FPS = IsPAL() ? 50 : 60;
     m_IsCodeMasters = IsCodeMasters();
 
 
@@ -340,7 +340,6 @@ BYTE Emulator::ReadMemory(const WORD& address)
             bankaddr-=0x8000;
             return context->m_CartridgeMemory[bankaddr];
         }
-        
     }
 
     return context->m_InternalMemory[addr];
@@ -419,9 +418,10 @@ void Emulator::WriteMemory(const WORD& address, const BYTE& data)
 void Emulator::DoMemPageCM(WORD address, BYTE data)
 {
     CONTEXTZ80* context = m_Z80.GetContext();
-    BYTE page = BitReset(data,7);
-    page = BitReset(page,6);
-    page = BitReset(page,5);
+    BYTE page = BitReset(data, 7);
+    page = BitReset(page, 6);
+    page = BitReset(page, 5);
+
     switch(address)
     {
         case 0x0: m_FirstBankPage = page; break; //memcpy(&context->m_InternalMemory[0x0], &context->m_CartridgeMemory[(0x4000*page)], 0x4000); break;
@@ -439,7 +439,7 @@ void Emulator::DoMemPage(WORD address, BYTE data)
     // memory paging. ROXOR!!!
     if (address >= 0xFFFC)
     {
-        // i think the seventh bit is never used in page mirroring.
+        // I think the seventh bit is never used in page mirroring.
         BYTE page = m_OneMegCartridge ? (data & 0x3F) : (data & 0x1F);
 
         context->m_InternalMemory[address-0x2000] = data; // ram mirror
@@ -627,7 +627,7 @@ bool Emulator::IsCodeMasters()
     WORD answer = context->m_InternalMemory[0x7fe9] << 8;
     answer |= context->m_InternalMemory[0x7fe8];
 
-    return compute == answer;
+    return (compute == answer);
 }
 
 ///////////////////////////////////////////////////////////////////////////////////

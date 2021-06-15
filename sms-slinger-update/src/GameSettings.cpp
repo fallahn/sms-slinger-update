@@ -32,15 +32,15 @@
 
 ///////////////////////////////////////////////////////////////////////////////////////////
 
-GameSettings* GameSettings::m_Instance = nullptr;
+std::unique_ptr<GameSettings> GameSettings::m_Instance;
 
 GameSettings* GameSettings::CreateInstance()
 {
     if (m_Instance == nullptr)
     {
-        m_Instance = new GameSettings();
+        m_Instance = std::make_unique<GameSettings>();
     }
-    return m_Instance;
+    return m_Instance.get();
 }
 
 ///////////////////////////////////////////////////////////////////////////////////////////
@@ -52,7 +52,7 @@ GameSettings* GameSettings::GetSingleton()
         LogMessage::GetSingleton()->DoLogMessage("Attempting to get the singleton of GameSettings when m_Instance is 0", true);
         assert(false);
     }
-    return m_Instance;
+    return m_Instance.get();
 }
 
 ///////////////////////////////////////////////////////////////////////////////////////////
@@ -102,11 +102,11 @@ bool GameSettings::LoadSettings()
         }
 
         char* tokens = nullptr;
-        tokens = strtok(buffer, ":");
+        tokens = std::strtok(buffer, ":");
         
         settingname = tokens;
         
-        tokens = strtok(nullptr, "*");
+        tokens = std::strtok(nullptr, "*");
         settingvalue = tokens;
 
         if (settingname.empty() || settingvalue.empty())
@@ -119,7 +119,6 @@ bool GameSettings::LoadSettings()
         m_Settings.insert(std::make_pair(settingname,settingvalue));
     }
 
-
     file.close();
 
     return true;
@@ -128,7 +127,7 @@ bool GameSettings::LoadSettings()
 
 ///////////////////////////////////////////////////////////////////////////////////////////
 
-std::string GameSettings::GetSetting(const std::string setting) const
+std::string GameSettings::GetSetting(const std::string& setting) const
 {
     std::string res = "";
     GAMESETTINGS::const_iterator it = m_Settings.find(setting);

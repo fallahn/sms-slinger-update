@@ -25,22 +25,25 @@
 
 #pragma once
 
+#include <memory>
+
 struct _iobuf;
 
 class LogMessage
 {
 public:
+                                    LogMessage();
+                                    ~LogMessage();
+
     static  LogMessage*             CreateInstance();
     static  LogMessage*             GetSingleton();
 
             void                    DoLogMessage(const char* message, bool logToConsole);
 
-                                    ~LogMessage();
 private:
-                                    LogMessage();
-            void                    Open();
-
-    static  LogMessage*             m_Instance ;
+    static  std::unique_ptr<LogMessage> m_Instance;
             _iobuf*                 m_LogFile;
             int                     m_FileNum;
+
+            void                    Open();
 };

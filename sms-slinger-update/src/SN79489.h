@@ -69,8 +69,8 @@ private:
             void                HandleSDLCallback(Uint8* buffer, int len);
             void                OpenSDLAudioDevice();
 
-    static  const unsigned int  BUFFERSIZE = 1024;
-    static  const int           FREQUENCY = 44100;
+    static  constexpr unsigned int  BUFFERSIZE = 1024;
+    static  constexpr int           FREQUENCY = 44100;
             signed short int    m_Buffer[BUFFERSIZE];
             WORD                m_Tones[TONES_NUM];
             BYTE                m_Volume[VOLUME_NUM];
