@@ -36,8 +36,8 @@ int main (int argsc, char** argsv)
 
     MasterSystem* sms = MasterSystem::CreateInstance();
     sms->CreateSDLWindow();
-    sms->StartRom(/*gs->GetSetting("ROMName").c_str()*/"roms/lander2_v0C.sms");
-    sms->BeginGame(/*atoi(gs->GetSetting("TargetFPS").c_str())*/50, false);
+    sms->StartRom("roms/lander2_v0C.sms");
+    sms->BeginGame(60, false);
     
     return 0;
 }

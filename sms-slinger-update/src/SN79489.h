@@ -31,7 +31,6 @@ class SN79489
 {
 public:
                                 SN79489();
-                                ~SN79489();
 
             void                WriteData(unsigned long int cycles, BYTE data);
             void                Reset();

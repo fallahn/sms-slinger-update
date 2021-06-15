@@ -29,10 +29,19 @@
 #include "Emulator.h"
 
 #include <cmath>
+#include <cstring>
 
 ////////////////////////////////////////////////////////////////////
 
-SN79489::SN79489(void)
+SN79489::SN79489()
+    : m_LatchedChannel  (CHANNEL::CHANNEL_ZERO),
+    m_IsToneLatched     (false),
+    m_CurrentBufferPos  (0),
+    m_Cycles            (0.f),
+    m_LFSR              (0),
+    m_ClockInfo         (0),
+    m_BufferUpdateCount (0.f),
+    m_UpdateBufferLimit (0.f)
 {
     const int maxVolume = 8000; // there are 4 channels and the output is a signed 16 bit num giving a range of -32,000 + 32,000 so 4 * 8000 fits into the range
     const double TwodBScalingFactor = 0.79432823; // each volume setting gets lower by 2 decibels
@@ -68,18 +77,12 @@ SN79489::SN79489(void)
 
 ////////////////////////////////////////////////////////////////////
 
-SN79489::~SN79489(void)
-{
-}
-
-////////////////////////////////////////////////////////////////////
-
 void SN79489::Reset()
 {
     m_BufferUpdateCount = 0;
-    memset(m_Buffer, 0 , sizeof(m_Buffer));
-    memset(m_Tones,0,sizeof(m_Tones));
-    memset(m_Counters,0,sizeof(m_Counters));
+    std::memset(m_Buffer, 0, sizeof(m_Buffer));
+    std::memset(m_Tones, 0, sizeof(m_Tones));
+    std::memset(m_Counters, 0, sizeof(m_Counters));
     m_ClockInfo = 0;
     
     for (int i = 0; i < 4; i++)
@@ -258,7 +261,9 @@ void SN79489::Update(float cyclesMac)
     for (int i = 0; i < CHANNEL_THREE; i++)
     {
         if (m_Tones[i] == 0)
+        {
             continue;
+        }
 
         m_Counters[i]-= static_cast<int>(floor);
 
@@ -305,15 +310,14 @@ void SN79489::Update(float cyclesMac)
         }
 
         tone += m_VolumeTable[m_Volume[TONES_NOISE]] * (m_LFSR & 1);
-        
     }
-
-    
 
     if (m_BufferUpdateCount >= m_UpdateBufferLimit)
     {
         if (m_CurrentBufferPos < BUFFERSIZE)
-            m_Buffer[m_CurrentBufferPos] = tone;   
+        {
+            m_Buffer[m_CurrentBufferPos] = tone;
+        }
             
         m_CurrentBufferPos++;
         m_BufferUpdateCount = m_UpdateBufferLimit - m_BufferUpdateCount;       
@@ -328,7 +332,6 @@ void SN79489::DumpClockInfo()
     memset(buffer,0,sizeof(buffer));
     sprintf(buffer, "Sound Chip Clock Cycles Per Second: %u", m_ClockInfo);
     LogMessage::GetSingleton()->DoLogMessage(buffer, true);
-
 
     m_ClockInfo = 0;
 }

@@ -30,6 +30,7 @@
 #include <memory.h>
 #include <cstdio>
 #include <cassert>
+#include <cstring>
 
 #include <SDL/SDL.h>
 #include <SDL/SDL_opengl.h>
@@ -89,18 +90,12 @@ void WriteIOByte(BYTE address, BYTE data)
 
 ///////////////////////////////////////////////////////////////////////////////////
 
-Emulator::Emulator(void) :
-    m_FPS(60)
-    ,m_IsPAL(false)
-    ,m_IsCodeMasters(false)
+Emulator::Emulator()
+    : m_FPS         (60),
+    m_IsPAL         (false),
+    m_IsCodeMasters (false)
 {
     Reset();
-}
-
-///////////////////////////////////////////////////////////////////////////////////
-
-Emulator::~Emulator(void)
-{
 }
 
 ///////////////////////////////////////////////////////////////////////////////////
@@ -180,11 +175,13 @@ void Emulator::InsertCartridge(const char* path)
         // http://www.smspower.org/forums/viewtopic.php?t=7999&highlight=header+512
         char header[1000];
         if (endPos == 512)
-            fread(header,1,512,in);
+        {
+            fread(header, 1, 512, in);
+        }
         else
         {
             assert(false); // im not sure if this is correct because the post says the last 64 bytes not the first
-            fread (header,1,64,in);
+            fread(header, 1, 64, in);
         }
     }
 
@@ -192,7 +189,7 @@ void Emulator::InsertCartridge(const char* path)
     m_OneMegCartridge = (endPos > 0x80000)?true:false;
     
 
-    memcpy(&context->m_InternalMemory[0x0], &context->m_CartridgeMemory[0x0], 0xC000);
+    std::memcpy(&context->m_InternalMemory[0x0], &context->m_CartridgeMemory[0x0], 0xC000);
 
     context->m_InternalMemory[0xFFFE] = 0x01;
     context->m_InternalMemory[0xFFFF] = 0x02;
@@ -229,14 +226,16 @@ void Emulator::Update()
     m_GraphicsChip.ResetScreen();
     while (!m_GraphicsChip.GetRefresh())
     //while (m_CyclesThisUpdate < targetCPU)
-    {
-            
+    { 
         int cycles = 0;
         if (m_Z80.GetContext()->m_Halted)
+        {
             cycles = 4;
+        }
         else
+        {
             cycles = m_Z80.ExecuteNextOpcode();
-
+        }
         CheckInterupts();
         
         //http://www.smspower.org/forums/viewtopic.php?p=44198      
@@ -244,7 +243,10 @@ void Emulator::Update()
         // convert from clock cycles to machine cycles
         // FIX ME! THIS SHOULD BE * 3, not * 2. HOWEVER WITH * 3 SOME GAMES FEEL REALLY CRAP AND SLOW
         // I BELIEVE ITS A VSYNC INTERRUPT ISSUE
-        cycles *= 2;
+
+        //potentially related to the (fixed) typo in TMS9918A::GetHCount()? M
+        //cycles *= 2;
+        cycles *= 3;
 
         m_CyclesThisUpdate += cycles;
         m_ClockInfo += cycles;
@@ -257,7 +259,6 @@ void Emulator::Update()
         float soundCycles = static_cast<float>(cycles);
         soundCycles /= CPU_CYCLES_TO_MACHINE_CLICKS;
         m_SoundChip.Update(soundCycles);       
-
     }
 }
 
@@ -271,6 +272,7 @@ void Emulator::CheckInterupts()
         m_Z80.IncreaseRReg();
         m_Z80.GetContext()->m_NMIServicing = true;
         m_Z80.GetContext()->m_NMI = false;
+
         CONTEXTZ80* context = m_Z80.GetContext();
         context->m_IFF1 = false;
         context->m_Halted = false;
@@ -301,9 +303,9 @@ BYTE Emulator::ReadMemory(const WORD& address)
     CONTEXTZ80* context = m_Z80.GetContext();
     WORD addr = address;
 
-    if (addr>=0xFFFC)
+    if (addr >= 0xFFFC)
     {
-        addr-=0x2000;
+        addr -= 0x2000;
     }
 
     // the fixed memory address
@@ -393,15 +395,22 @@ void Emulator::WriteMemory(const WORD& address, const BYTE& data)
     if (address >= 0xFFFC)
     {
         if (!m_IsCodeMasters)
+        {
             DoMemPage(address, data);
+        }
     }
 
     //  if you uncomment the following crap, you need to find out what happens to the rom/ram banking with mirroring
     // for example if address == 0xDFFF then mirroring with overwrite 0xFFFF which is a ram bank. Should I allow this?
     if (address >= 0xC000 && address < 0xDFFC)
-        context->m_InternalMemory[address+0x2000] = data;
+    {
+        context->m_InternalMemory[address + 0x2000] = data;
+    }
+
     if (address >= 0xE000)
-        context->m_InternalMemory[address-0x2000] = data;
+    {
+        context->m_InternalMemory[address - 0x2000] = data;
+    }
 }
 
 
@@ -431,17 +440,17 @@ void Emulator::DoMemPage(WORD address, BYTE data)
     if (address >= 0xFFFC)
     {
         // i think the seventh bit is never used in page mirroring.
-        BYTE page = m_OneMegCartridge?data & 0x3F: data & 0x1F;
+        BYTE page = m_OneMegCartridge ? (data & 0x3F) : (data & 0x1F);
 
         context->m_InternalMemory[address-0x2000] = data; // ram mirror
 
         if (false)
         {
-        char buffer[200];
-        sprintf (buffer, "Mem Paging address %x datd %x page %x", address, data, page);
-        LogMessage::GetSingleton()->DoLogMessage(buffer, false);
-
+            char buffer[200];
+            sprintf (buffer, "Mem Paging address %x datd %x page %x", address, data, page);
+            LogMessage::GetSingleton()->DoLogMessage(buffer, false);
         }
+
         switch(address)
         {
             case 0xFFFC:
@@ -453,9 +462,13 @@ void Emulator::DoMemPage(WORD address, BYTE data)
                     bool secondBank = TestBit(data,2);
 
                     if (secondBank)
+                    {
                         m_CurrentRam = 1;//memcpy(&context->m_InternalMemory[0x8000], &m_RamBank[1], 0x4000);
+                    }
                     else
+                    {
                         m_CurrentRam = 0;//memcpy(&context->m_InternalMemory[0x8000], &m_RamBank[0], 0x4000);
+                    }
                 }
                 else
                 {
@@ -463,7 +476,7 @@ void Emulator::DoMemPage(WORD address, BYTE data)
                 }
 
                 // apparently no games use ram banking in address 0xC000
-                assert(TestBit(data,4)==0);
+                assert(TestBit(data,4) == 0);
             }
             break;
 
@@ -582,16 +595,16 @@ bool Emulator::IsPAL() const
 
 void Emulator::SetKeyPressed(int player, int key)
 {
-    BYTE& port = (player==1)?m_KeyboardPort1:m_KeyboardPort2;
-    port = BitReset(port,key);
+    BYTE& port = (player == 1) ? m_KeyboardPort1 : m_KeyboardPort2;
+    port = BitReset(port, key);
 }
 
 ///////////////////////////////////////////////////////////////////////////////////
 
 void Emulator::SetKeyReleased(int player, int key)
 {
-    BYTE& port = (player==1)?m_KeyboardPort1:m_KeyboardPort2;
-    port = BitSet(port,key);
+    BYTE& port = (player == 1) ? m_KeyboardPort1 : m_KeyboardPort2;
+    port = BitSet(port, key);
 }
 ///////////////////////////////////////////////////////////////////////////////////
 
@@ -605,7 +618,9 @@ bool Emulator::IsCodeMasters()
     checksum |= context->m_InternalMemory[0x7fe6];
 
     if (checksum == 0x0)
+    {
         return false;
+    }
 
     WORD compute = 0x10000 - checksum;
 
@@ -626,7 +641,7 @@ void Emulator::ResetButton()
         context->m_NMI = true;
     }
 
-    SetKeyPressed(2,4);
+    SetKeyPressed(2, 4);
 }
 
 ///////////////////////////////////////////////////////////////////////////////////

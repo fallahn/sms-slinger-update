@@ -34,9 +34,13 @@
 void Z80::IncreaseRReg()
 {
     if ((m_ContextZ80.m_RegisterR & 127) == 127)
+    {
         m_ContextZ80.m_RegisterR = m_ContextZ80.m_RegisterR & 128;
+    }
     else
+    {
         m_ContextZ80.m_RegisterR++;
+    }
 }
 
 void Z80::ExecuteOpcode(const BYTE& opcode)
@@ -801,7 +805,7 @@ void Z80::ExecuteDDFDCBOpcode(bool isDD)
 
     m_ContextZ80.m_ProgramCounter++;
 
-    REGISTERZ80& reg = (isDD)?m_ContextZ80.m_RegisterIX : m_ContextZ80.m_RegisterIY;
+    REGISTERZ80& reg = (isDD) ? m_ContextZ80.m_RegisterIX : m_ContextZ80.m_RegisterIY;
 
     switch(opcode)
     {
@@ -1228,7 +1232,6 @@ void Z80::ExecuteDDFDOpcode(bool isDD)
 
     switch(opcode)
     {
-
         case 0xE1: reg.reg = PopWordOffStack();  m_ContextZ80.m_OpcodeCycle=14;break;
         case 0xE5: PushWordOntoStack(reg.reg);  m_ContextZ80.m_OpcodeCycle=15; break;
         case 0x21: CPU_16BIT_LOAD(reg.reg);m_ContextZ80.m_OpcodeCycle=14;break;

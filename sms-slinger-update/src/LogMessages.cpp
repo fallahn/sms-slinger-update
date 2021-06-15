@@ -53,20 +53,21 @@ LogMessage* LogMessage::GetSingleton()
 
 ////////////////////////////////////////////////////////////////////////////////////////
 
-LogMessage::LogMessage(void) :
-    m_LogFile(NULL)
-    ,m_FileNum(1)
+LogMessage::LogMessage()
+    : m_LogFile (nullptr),
+    m_FileNum   (1)
 {
     Open();
-    
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////
 
-LogMessage::~LogMessage(void)
+LogMessage::~LogMessage()
 {
-    if (NULL != m_LogFile)
+    if (m_LogFile != nullptr)
+    {
         fclose((FILE*)m_LogFile);
+    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////
@@ -83,7 +84,7 @@ void LogMessage::Open()
 
 void LogMessage::DoLogMessage(const char* message, bool logToConsole)
 {
-    if (NULL != m_LogFile)
+    if (m_LogFile != nullptr)
     {
         long long size = ftell(m_LogFile);
         if (size >= (30 * 1024 * 1024))
@@ -95,8 +96,10 @@ void LogMessage::DoLogMessage(const char* message, bool logToConsole)
         fputs("\r\n", (FILE*)m_LogFile);
     }
 
-    if (false == logToConsole)
+    if (!logToConsole)
+    {
         return;
+    }
 
     printf(message);
     printf("\n");

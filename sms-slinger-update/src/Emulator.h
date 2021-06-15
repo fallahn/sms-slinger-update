@@ -35,8 +35,6 @@ public:
     static  Emulator* CreateInstance();
     static  Emulator* GetSingleton();
 
-    ~Emulator(void);
-
     void                Reset();
     void                InsertCartridge(const char* path);
     void                Update();

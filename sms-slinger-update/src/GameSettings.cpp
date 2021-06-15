@@ -64,12 +64,6 @@ GameSettings::GameSettings()
 
 ///////////////////////////////////////////////////////////////////////////////////////////
 
-GameSettings::~GameSettings()
-{
-}
-
-///////////////////////////////////////////////////////////////////////////////////////////
-
 bool GameSettings::LoadSettings()
 {
     m_Settings.clear();
@@ -96,26 +90,28 @@ bool GameSettings::LoadSettings()
     // load in all the settings a line at a time
     while (false == file.eof())
     {
-        memset(buffer, 0, sizeof(buffer));
+        std::memset(buffer, 0, sizeof(buffer));
         file.getline(buffer,256);
         
         char ch = buffer[0];
 
         // ignore blank lines, comments etc
         if ('\0' == ch || '*' == ch || '\r' == ch || '\n' == ch)
+        {
             continue;
+        }
 
-        char* tokens = NULL;
+        char* tokens = nullptr;
         tokens = strtok(buffer, ":");
         
         settingname = tokens;
         
-        tokens = strtok(NULL, "*");
+        tokens = strtok(nullptr, "*");
         settingvalue = tokens;
 
         if (settingname.empty() || settingvalue.empty())
         {
-            LogMessage::GetSingleton()->DoLogMessage("Settings.ini appears to be malformed",true);
+            LogMessage::GetSingleton()->DoLogMessage("Settings.ini appears to be malformed", true);
             file.close();
             return false;
         }

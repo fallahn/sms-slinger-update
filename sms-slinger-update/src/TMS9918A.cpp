@@ -64,28 +64,22 @@ void GetOldStyleColour(BYTE colNum, BYTE& red, BYTE& green, BYTE& blue)
 
 /////////////////////////////////////////////////////////////////////////
 
-TMS9918A::TMS9918A(void) :
-    m_IsPAL(true)
-    ,m_NumScanlines(NUM_NTSC_VERTICAL)
-    ,m_IsVBlank(false)
-    ,m_IsSecondControlWrite(false)
-    ,m_Status(0)
-    ,m_RequestInterupt(false)
-    ,m_VScroll(0)
-    ,m_ReadBuffer(0)
-    ,m_Width(NUM_RES_HORIZONTAL)
-    ,m_Height(NUM_RES_VERTICAL)
-    ,m_TempWord(0)
-    ,m_Refresh(false)
-    ,m_UseGFXOpt(false)
+TMS9918A::TMS9918A()
+    : m_IsPAL               (true),
+    m_NumScanlines          (NUM_NTSC_VERTICAL),
+    m_IsVBlank              (false),
+    m_IsSecondControlWrite  (false),
+    m_Status                (0),
+    m_RequestInterupt       (false),
+    m_VScroll               (0),
+    m_ReadBuffer            (0),
+    m_Width                 (NUM_RES_HORIZONTAL),
+    m_Height                (NUM_RES_VERTICAL),
+    m_TempWord              (0),
+    m_Refresh               (false),
+    m_UseGFXOpt             (false)
 {
     Reset(false);
-}
-
-/////////////////////////////////////////////////////////////////////////
-
-TMS9918A::~TMS9918A(void)
-{
 }
 
 /////////////////////////////////////////////////////////////////////////
@@ -94,9 +88,9 @@ void TMS9918A::Reset(bool isPAL)
 {
     m_RefreshRatePerSecond = 0;
     m_ClockInfo = 0;
-    memset(&m_VRAM, 0, sizeof(m_VRAM));
-    memset(&m_CRAM, 0, sizeof(m_CRAM));
-    memset(&m_VDPRegisters,0,sizeof(m_VDPRegisters));
+    std::memset(&m_VRAM, 0, sizeof(m_VRAM));
+    std::memset(&m_CRAM, 0, sizeof(m_CRAM));
+    std::memset(&m_VDPRegisters, 0, sizeof(m_VDPRegisters));
 
     m_VDPRegisters[0x2] = 0xFF; // will deafualt name table to 0x3800
     m_VDPRegisters[0x3] = 0xFF; // must set all bits
@@ -117,7 +111,7 @@ void TMS9918A::Reset(bool isPAL)
     m_IsPAL = isPAL;
     m_VCounterFirst = true;
 
-    m_NumScanlines = m_IsPAL?NUM_PAL_VERTICAL:NUM_NTSC_VERTICAL;
+    m_NumScanlines = m_IsPAL ? NUM_PAL_VERTICAL : NUM_NTSC_VERTICAL;
 
     m_Height = NUM_RES_VERTICAL;
     m_RunningCycles = 0;
@@ -148,7 +142,9 @@ void TMS9918A::Update(float nextCycle)
 
     // are we moving off this scanline onto the next?
     if ((hcount + cycles) > MACHINE_CLICKS_PER_SCANLINE)
+    {
         nextline = true;
+    }
 
     m_HCounter = (m_HCounter + cycles) % (MACHINE_CLICKS_PER_SCANLINE + 1);
 
@@ -165,7 +161,9 @@ void TMS9918A::Update(float nextCycle)
             m_VCounterFirst = true;
             
             if (!m_UseGFXOpt)
+            {
                 Render();
+            }
             m_Refresh = true;
         }
         else if ((m_VCounter == GetVJump()) && m_VCounterFirst) 
@@ -178,7 +176,9 @@ void TMS9918A::Update(float nextCycle)
         else if (m_VCounter == m_Height)
         {
             if (m_UseGFXOpt)
+            {
                 RenderOpt();
+            }
             m_IsVBlank = true;
             m_Status = BitSet(m_Status, 7);
         }
@@ -187,26 +187,35 @@ void TMS9918A::Update(float nextCycle)
         {
             // do not reload the line interupt until we are past the FIRST line of the none active display period
             if (m_VCounter != m_Height)
+            {
                 m_LineInterupt = m_VDPRegisters[0xA];
+            }
 
             m_VScroll = m_VDPRegisters[0x9];
             BYTE mode = GetVDPMode();
             if (mode == 11)
+            {
                 m_Height = NUM_RES_VERT_MED;
+            }
             else if (mode == 14)
+            {
                 m_Height = NUM_RES_VERT_HIGH;
+            }
             else
+            {
                 m_Height = NUM_RES_VERTICAL;
+            }
         }
 
         // else if we are still drawing the screen then draw next scanline
         if (m_VCounter < m_Height)
         {
-
             m_ScreenDisabled = !IsRegBitSet(1,6);
             
-        if (!m_UseGFXOpt)
-            Render();
+            if (!m_UseGFXOpt)
+            {
+                Render();
+            }
         }
 
         // decrement the line interupt counter during the active display period
@@ -224,13 +233,17 @@ void TMS9918A::Update(float nextCycle)
             if (underflow)
             {
                 m_LineInterupt = m_VDPRegisters[0xA];
-                if (IsRegBitSet(0,4))
+                if (IsRegBitSet(0, 4))
+                {
                     m_RequestInterupt = true;
+                }
             }
         }
     }
-    if (TestBit(m_Status,7) && IsRegBitSet(1,5))
+    if (TestBit(m_Status, 7) && IsRegBitSet(1, 5))
+    {
         m_RequestInterupt = true;
+    }
 
     m_RunningCycles -= clockInfo;
 }
@@ -315,8 +328,8 @@ BYTE TMS9918A::ReadDataPort()
 
     switch (GetCodeRegister())
     {
-        case 0: m_ReadBuffer = m_VRAM[ GetAddressRegister() ]; break; // not sure about this one
-        case 1: m_ReadBuffer = m_VRAM[ GetAddressRegister() ];break;
+        case 0: m_ReadBuffer = m_VRAM[GetAddressRegister()]; break; // not sure about this one
+        case 1: m_ReadBuffer = m_VRAM[GetAddressRegister()]; break;
         default: assert(false); break;
     }
 
@@ -335,10 +348,10 @@ void TMS9918A::WriteDataPort(BYTE data)
 
     switch (code)
     {
-        case 0: m_VRAM[ GetAddressRegister() ] = data; break; // not sure about this one
-        case 1: m_VRAM[ GetAddressRegister() ] = data; break;
-        case 2: m_VRAM[ GetAddressRegister() ] = data; break;
-        case 3: m_CRAM[ GetAddressRegister() & 31 ] = data; break; // write to CRAM
+        case 0: m_VRAM[GetAddressRegister()] = data; break; // not sure about this one
+        case 1: m_VRAM[GetAddressRegister()] = data; break;
+        case 2: m_VRAM[GetAddressRegister()] = data; break;
+        case 3: m_CRAM[GetAddressRegister() & 31] = data; break; // write to CRAM
         default: assert(false); break;
     }
 
@@ -386,14 +399,18 @@ void TMS9918A::SetRegData()
     reg &= 0xF;
 
     if (reg > 11)
+    {
         return;
+    }
 
     m_VDPRegisters[reg] = data;
 
     if (reg == 5)
     {
-        if (TestBit(m_Status,7) && IsRegBitSet(1,5))
+        if (TestBit(m_Status, 7) && IsRegBitSet(1, 5))
+        {
             m_RequestInterupt = true;
+        }
     }
 }
 
@@ -402,7 +419,9 @@ void TMS9918A::SetRegData()
 void TMS9918A::RenderOpt()
 {
     if (!m_FrameToggle)
+    {
         return;
+    }
 
     BYTE vCounterBackup = m_VCounter;
     BYTE mode = GetVDPMode();
@@ -426,7 +445,6 @@ void TMS9918A::RenderOpt()
         }
     }
     m_VCounter = vCounterBackup;
-
 }
 
 /////////////////////////////////////////////////////////////////////////
@@ -434,7 +452,9 @@ void TMS9918A::RenderOpt()
 void TMS9918A::Render()
 {
     if (!m_FrameToggle)
+    {
         return;
+    }
 
     BYTE mode = GetVDPMode();
         
@@ -452,7 +472,6 @@ void TMS9918A::Render()
         RenderSpritesMode4();
         RenderBackgroundMode4();
     }
-    
 }
 
 /////////////////////////////////////////////////////////////////////////
@@ -507,7 +526,9 @@ void TMS9918A::RenderSpritesMode2()
             colour &= 0xF;
 
             if (colour == 0)
-                continue;      
+            {
+                continue;
+            }
 
             spriteCount++;
 
@@ -535,7 +556,6 @@ void TMS9918A::RenderSpritesMode2()
             }
         }
     }
-
 
     m_Status &= 0xE0; // turn off last 5 bits
     m_Status |= 31; // puts last sprite into last 5 bits   
@@ -572,8 +592,10 @@ void TMS9918A::DrawMode2Sprite(const WORD& address, BYTE x, BYTE line, BYTE colo
             continue;
         }
 
-        if (!TestBit(drawLine,invert))
+        if (!TestBit(drawLine, invert))
+        {
             continue;
+        }
 
         WriteToScreen(xpos, m_VCounter, red,green,blue);
     }
@@ -595,7 +617,7 @@ void TMS9918A::RenderSpritesMode4()
     bool useSecondPattern = IsRegBitSet(6,2);
 
     // is it 8x16 sprite?
-    if (IsRegBitSet(1,1))
+    if (IsRegBitSet(1, 1))
     {
         is8x16 = true;
         size = 16;
@@ -612,7 +634,9 @@ void TMS9918A::RenderSpritesMode4()
         int y = m_VRAM[satbase+sprite];
 
         if ((m_Height == NUM_RES_VERTICAL) && (y == 0xD0))
+        {
             break;
+        }
 
         if (y > 0xD0)
         {
@@ -635,17 +659,23 @@ void TMS9918A::RenderSpritesMode4()
 
             // if bit 3 of reg0 is set, x -= 8
             if (shiftX)
-                x-=8;
+            {
+                x -= 8;
+            }
 
             // are we using first sprite patterns or second
             if (useSecondPattern)
+            {
                 tileNumber += 256;
+            }
 
             // i believe this also affects tileNumber
             if (is8x16)
             {
                 if (y < (vCounter + 9))
-                    tileNumber = BitReset(tileNumber,0);
+                {
+                    tileNumber = BitReset(tileNumber, 0);
+                }
             }
 
             int i;
@@ -686,7 +716,9 @@ void TMS9918A::RenderSpritesMode4()
 
                 // palette 0 is transparency
                 if (palette == 0)
+                {
                     continue;
+                }
 
                 BYTE colour = m_CRAM[palette+16];
 
@@ -696,8 +728,6 @@ void TMS9918A::RenderSpritesMode4()
                 colour >>=2;
                 BYTE blue = colour & 0x3;
 
-                
-                
                 WriteToScreen(x+i, vCounter,GetColourShade(red),GetColourShade(green),GetColourShade(blue));
             }
         }
@@ -708,21 +738,21 @@ void TMS9918A::RenderSpritesMode4()
 
 bool TMS9918A::IsRegBitSet(int reg, BYTE bit)
 {
-    return TestBit(m_VDPRegisters[reg],bit);
+    return TestBit(m_VDPRegisters[reg], bit);
 }
 
 /////////////////////////////////////////////////////////////////////////
 
 void TMS9918A::SetSpriteOverflow()
 {
-    m_Status = BitSet(m_Status,6);
+    m_Status = BitSet(m_Status, 6);
 }
 
 /////////////////////////////////////////////////////////////////////////
 
 void TMS9918A::SetSpriteCollision()
 {
-    m_Status = BitSet(m_Status,5);
+    m_Status = BitSet(m_Status, 5);
 }
 
 /////////////////////////////////////////////////////////////////////////
@@ -738,10 +768,10 @@ void TMS9918A::RenderBackgroundMode2()
     BYTE reg4 = m_VDPRegisters[0x4];
 
     // if bit 2 is set of reg 4 the pattern table address starts at 0x2000 otherwise 0x0
-    WORD pgBase = TestBit(reg4,2)?0x2000:0x0;
+    WORD pgBase = TestBit(reg4, 2) ? 0x2000 : 0x0;
 
     // if bit 7 is set of reg 3 the colour table address starts at 0x2000 otherwise 0x0
-    WORD colBase = TestBit(reg3,7)?0x2000:0x0;
+    WORD colBase = TestBit(reg3, 7) ? 0x2000 : 0x0;
 
     // bits 0 to 6 of reg 3 get anded over bits 1-7 of the character number
     BYTE colAnd = reg3 & 127;
@@ -750,7 +780,7 @@ void TMS9918A::RenderBackgroundMode2()
     colAnd <<= 1;
 
     // make sure bit 0 is set to it doesnt affect bit 0 of character number as we only want to affect 1-7
-    colAnd = BitSet(colAnd,0);
+    colAnd = BitSet(colAnd, 0);
     
     int row = m_VCounter / 8;
 
@@ -764,15 +794,19 @@ void TMS9918A::RenderBackgroundMode2()
         if (row > 15)
         {
             // then use table 3 if bit 1 of reg 4 is set else use table 0
-            if (TestBit(reg4,1))
+            if (TestBit(reg4, 1))
+            {
                 pgTable = 2;
+            }
         }
         // we must be drawing the middle third
         else
         {
             // then use table 2 if bit 0 of reg 4 is set else use table 0
-            if (TestBit(reg4,0))
+            if (TestBit(reg4, 0))
+            {
                 pgTable = 1;
+            }
         }
     }
 
@@ -780,9 +814,13 @@ void TMS9918A::RenderBackgroundMode2()
     WORD pgOffset = 0;
 
     if (pgTable == 1)
-        pgOffset= 256 * 8;
+    {
+        pgOffset = 256 * 8;
+    }
     else if (pgTable == 2)
-        pgOffset= 256 * 2 * 8;
+    {
+        pgOffset = 256 * 2 * 8;
+    }
 
     int line = m_VCounter % 8;
 
@@ -809,7 +847,9 @@ void TMS9918A::RenderBackgroundMode2()
             BYTE colNum = TestBit(pixelLine, invert)?fore:back;
 
             if (colNum == 0)
+            {
                 continue;
+            }
 
             BYTE red = 0;
             BYTE green = 0;
@@ -818,11 +858,15 @@ void TMS9918A::RenderBackgroundMode2()
             GetOldStyleColour(colNum, red,green,blue);
             int xpos = (column * 8) + x;
 
-            if (GetScreenPixelColour(xpos,m_VCounter,0) != SCREENBLANKCOLOUR)
+            if (GetScreenPixelColour(xpos, m_VCounter, 0) != SCREENBLANKCOLOUR)
+            {
                 continue;
+            }
 
             if (xpos >= NUM_RES_HORIZONTAL)
+            {
                 continue;
+            }
 
             WriteToScreen(xpos, m_VCounter, red,green,blue);       
         }
@@ -885,9 +929,11 @@ void TMS9918A::RenderBackgroundMode4()
                 
                 int bumpRow = vCounter % 8;
                 if ((bumpRow + vFineScroll) > 7)
+                {
                     vrow++;
+                }
 
-                int mod = (m_Height == NUM_RES_VERTICAL)?28:32;
+                int mod = (m_Height == NUM_RES_VERTICAL) ? 28 : 32;
                 vrow = vrow % mod;
             }           
 
@@ -909,8 +955,9 @@ void TMS9918A::RenderBackgroundMode4()
             int offset = vCounter;;            
 
             if (allowvscroll)
+            {
                 offset += vScroll;
-
+            }
             offset = offset % 8;
 
             if (vertFlip)
@@ -955,11 +1002,15 @@ void TMS9918A::RenderBackgroundMode4()
             // a tile can only have a high priority if it isnt palette 0
             // if this doesnt work try chaning the if statement to if(palette == (m_VDPRegisters[0x7] & 15))
             if (palette == 0)
+            {
                 hiPriority = false;
-      
+            }
+
             if (useSpritePalette)
-                palette+=16;
-      
+            {
+                palette += 16;
+            }
+
             BYTE colour = m_CRAM[palette];
                   
             BYTE red = colour & 0x3;
@@ -969,11 +1020,15 @@ void TMS9918A::RenderBackgroundMode4()
             BYTE blue = colour & 0x3;      
 
             // a sprite is drawn here so lets not overwrite it :)
-            if (!masking && !hiPriority && (GetScreenPixelColour(xpos,m_VCounter,0) != SCREENBLANKCOLOUR))
+            if (!masking && !hiPriority && (GetScreenPixelColour(xpos, m_VCounter, 0) != SCREENBLANKCOLOUR))
+            {
                 continue;
-      
+            }
+
             if (xpos >= NUM_RES_HORIZONTAL)
+            {
                 continue;
+            }
 
             WriteToScreen(xpos,vCounter,GetColourShade(red),GetColourShade(green),GetColourShade(blue));
         }
@@ -986,21 +1041,25 @@ void TMS9918A::RenderBackgroundMode4()
 void TMS9918A::ResetScreen()
 {
     if (m_UseGFXOpt)
+    {
         m_FrameToggle = !m_FrameToggle;
+    }
     else
+    {
         m_FrameToggle = true;
+    }
 
     if (m_Height == NUM_RES_VERTICAL)
     {
-        memset(m_ScreenStandard, SCREENBLANKCOLOUR, sizeof(m_ScreenStandard));
+        std::memset(m_ScreenStandard, SCREENBLANKCOLOUR, sizeof(m_ScreenStandard));
     }
     else if (m_Height == NUM_RES_VERT_MED)
     {
-        memset(m_ScreenMed, SCREENBLANKCOLOUR, sizeof(m_ScreenMed));
+        std::memset(m_ScreenMed, SCREENBLANKCOLOUR, sizeof(m_ScreenMed));
     }
     else if (m_Height == NUM_RES_VERT_HIGH)
     {
-        memset(m_ScreenHigh, SCREENBLANKCOLOUR, sizeof(m_ScreenHigh));
+        std::memset(m_ScreenHigh, SCREENBLANKCOLOUR, sizeof(m_ScreenHigh));
     }
 }
 
@@ -1012,8 +1071,8 @@ WORD TMS9918A::GetSATBase() const
     BYTE reg5 = m_VDPRegisters[0x5];
 
     // bits 7 and 0 are ignored
-    reg5 = BitReset(reg5,7);
-    reg5 = BitReset(reg5,0);
+    reg5 = BitReset(reg5, 7);
+    reg5 = BitReset(reg5, 0);
 
     WORD res = reg5 << 7;
     return res;
@@ -1062,7 +1121,6 @@ BYTE TMS9918A::GetColourShade(BYTE val) const
         case 2: return 170; break;
         default : assert(false); return 0; break;
     }
-
 }
 
 /////////////////////////////////////////////////////////////////////////
@@ -1081,7 +1139,6 @@ BYTE TMS9918A::GetVDPMode() const
 
 void TMS9918A::WriteToScreen(BYTE x, BYTE y,BYTE red, BYTE green, BYTE blue)
 {
-    
     if (m_Height == NUM_RES_VERTICAL)
     {
         m_ScreenStandard[y][x][0] = red;
@@ -1100,7 +1157,6 @@ void TMS9918A::WriteToScreen(BYTE x, BYTE y,BYTE red, BYTE green, BYTE blue)
         m_ScreenHigh[y][x][1] = green;
         m_ScreenHigh[y][x][2] = blue;
     }
-
 }
 
 /////////////////////////////////////////////////////////////////////////
@@ -1110,7 +1166,6 @@ BYTE TMS9918A::GetScreenPixelColour(BYTE x, BYTE y, int index) const
     if (m_Height == NUM_RES_VERTICAL)
     {
         return m_ScreenStandard[y][x][index] ;
-        
     }
     else if (m_Height == NUM_RES_VERT_MED)
     {
@@ -1129,18 +1184,28 @@ BYTE TMS9918A::GetVJump() const
     if (m_IsPAL)
     {
         if (m_Height == NUM_RES_VERTICAL)
+        {
             return 0xF2;
+        }
         else if (m_Height == NUM_RES_VERT_MED)
+        {
             return 0xFF;
+        }
         else
+        {
             return 0xFF;
+        }
     }
     else
     {
         if (m_Height == NUM_RES_VERTICAL)
+        {
             return 0xDA;
+        }
         else if (m_Height == NUM_RES_VERT_MED)
+        {
             return 0xEA;
+        }
         else
         {
             assert(false); // should never be used
@@ -1156,18 +1221,28 @@ BYTE TMS9918A::GetVJumpTo() const
     if (m_IsPAL)
     {
         if (m_Height == NUM_RES_VERTICAL)
+        {
             return 0xBA;
+        }
         else if (m_Height == NUM_RES_VERT_MED)
+        {
             return 0xC7;
+        }
         else
+        {
             return 0xC1;
+        }
     }
     else
     {
         if (m_Height == NUM_RES_VERTICAL)
+        {
             return 0xD5;
+        }
         else if (m_Height == NUM_RES_VERT_MED)
+        {
             return 0xE5;
+        }
         else
         {
             assert(false); // should never be used
@@ -1180,20 +1255,25 @@ BYTE TMS9918A::GetVJumpTo() const
 
 void TMS9918A::DumpVRAM()
 {
-    using namespace std;
-    ofstream outputFile("c:/output.txt");    
+    std::ofstream outputFile("c:/output.txt");
     for (int i = 0; i <= 0x3FFF; i++)
     {
         char buffer[10];
-        memset(buffer,'\0', sizeof(buffer));
+        std::memset(buffer,'\0', sizeof(buffer));
         BYTE val = m_VRAM[i];
         if (val < 0x10)
+        {
             sprintf(buffer, "0%x", val);
+        }
         else
+        {
             sprintf(buffer, "%x", val);
+        }
         outputFile << buffer << " ";
         if ((i != 0) && ((i % 16) == 15))
-            outputFile << endl;
+        {
+            outputFile << std::endl;
+        }
     }
     outputFile.close();
 }
@@ -1216,7 +1296,7 @@ BYTE TMS9918A::GetHCounter() const
 {
     // only uses 9 bits
     WORD mod = m_HCounter & 511;
-    //mod >> 1;
+    //mod >> 1; //this must be a typo, right? M
     mod >>= 1;
     BYTE res = mod & 0xFFFF;
     return res;
@@ -1227,10 +1307,9 @@ BYTE TMS9918A::GetHCounter() const
 void TMS9918A::DumpClockInfo()
 {
     char buffer[255];
-    memset(buffer,0,sizeof(buffer));
+    std::memset(buffer,0,sizeof(buffer));
     sprintf(buffer, "Graphics Chip Clock Cycles Per Second: %u There has beed %d frames", m_ClockInfo, m_RefreshRatePerSecond);
     LogMessage::GetSingleton()->DoLogMessage(buffer, true);
-
 
     m_ClockInfo = 0;
     m_RefreshRatePerSecond = 0;

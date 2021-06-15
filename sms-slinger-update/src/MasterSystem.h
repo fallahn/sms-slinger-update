@@ -40,8 +40,7 @@ public:
             void                BeginGame(int fps, bool useGfxOpt);
             unsigned char       GetMemoryByte(int i);
 
-                                ~MasterSystem();
-
+            ~MasterSystem();
 private:
                                 MasterSystem();
 

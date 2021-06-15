@@ -88,7 +88,6 @@ class Z80
 {
 public:
                         Z80();
-                        ~Z80();
 
         int             ExecuteNextOpcode();
         void            PushWordOntoStack(WORD address);

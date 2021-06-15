@@ -30,24 +30,19 @@
 
 #include <cassert>
 #include <cstdio>
-#include <memory.h>
+#include <cstring>
 
 
 ///////////////////////////////////////////////////////////////////////
 
-Z80::Z80(void)
+Z80::Z80()
 {
-    memset(&m_DAATable,0,sizeof(m_DAATable));
-    memset(&m_ZSPTable,0,sizeof(m_ZSPTable));
+    std::memset(&m_DAATable,0,sizeof(m_DAATable));
+    std::memset(&m_ZSPTable,0,sizeof(m_ZSPTable));
     InitDAATable();
 }
 
 ///////////////////////////////////////////////////////////////////////
-
-Z80::~Z80(void)
-{
-
-}
 
 WORD Z80::GetIXIYAddress(WORD ixiy)
 {
@@ -159,8 +154,10 @@ void Z80::InitDAATable()
         BYTE vFlag = 0x04;
         for (int v = 128; v != 0; v >>= 1) 
         {
-            if (i & v) 
+            if (i & v)
+            {
                 vFlag ^= 0x04;
+            }
         }
         m_ZSPTable[i] = zFlag | sFlag | vFlag;
     }
@@ -185,12 +182,14 @@ void Z80::InitDAATable()
             if (lo >= 10) 
             {
                 diff = (hi <= 8) ? 0x06 : 0x66;
-            } else 
+            }
+            else 
             {
                 if (hi >= 10) 
                 {
                     diff = hf ? 0x66 : 0x60;
-                } else 
+                }
+                else 
                 {
                     diff = hf ? 0x06 : 0x00;
                 }

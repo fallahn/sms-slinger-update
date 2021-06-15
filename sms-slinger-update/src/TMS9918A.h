@@ -39,7 +39,6 @@ public:
     static const    int         MACHINE_CLICKS_PER_SCANLINE = 684;
 
                                 TMS9918A();
-                                ~TMS9918A();
 
                     void        Update(float cycles);
                     void        Reset(bool isPAL);

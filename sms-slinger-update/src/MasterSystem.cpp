@@ -28,10 +28,12 @@
 #include "Emulator.h"
 #include "TMS9918A.h"
 
-static const int WINDOWWIDTH = 256;
-static const int WINDOWHEIGHT = 192;
-static const int SCREENSCALE = 1;
-
+namespace
+{
+    constexpr int WINDOWWIDTH = 256;
+    constexpr int WINDOWHEIGHT = 192;
+    constexpr int SCREENSCALE = 1;
+}
 
 /////////////////////////////////////////////////////////////////////////
 
@@ -48,18 +50,18 @@ MasterSystem* MasterSystem::CreateInstance()
 
 /////////////////////////////////////////////////////////////////////////
 
-MasterSystem::MasterSystem(void) :
-    m_Emulator(NULL)
-    ,m_UseGFXOpt(false),
-    m_Width(0),
-    m_Height(0)
+MasterSystem::MasterSystem()
+    : m_Emulator(nullptr),
+    m_UseGFXOpt (false),
+    m_Width     (0),
+    m_Height    (0)
 {
     m_Emulator = Emulator::CreateInstance();
 }
 
 /////////////////////////////////////////////////////////////////////////
 
-MasterSystem::~MasterSystem(void)
+MasterSystem::~MasterSystem()
 {
     delete m_Emulator;
 }
@@ -68,8 +70,8 @@ MasterSystem::~MasterSystem(void)
 
 bool MasterSystem::CreateSDLWindow()
 {
-    m_Width = WINDOWWIDTH*SCREENSCALE;
-    m_Height = WINDOWHEIGHT*SCREENSCALE;
+    m_Width = WINDOWWIDTH * SCREENSCALE;
+    m_Height = WINDOWHEIGHT * SCREENSCALE;
     if(SDL_Init(SDL_INIT_EVERYTHING) < 0)
     {
         return false;
@@ -158,7 +160,9 @@ void MasterSystem::RomLoop(int fps)
     bool sync=true;
 
     if (fps == -1)
+    {
         sync = false;
+    }
 
     unsigned int time2 = SDL_GetTicks();
 
@@ -201,7 +205,6 @@ void MasterSystem::RomLoop(int fps)
 
 void MasterSystem::RenderGame()
 {   
-
     if (TMS9918A::m_FrameToggle && !TMS9918A::m_ScreenDisabled)
     {
         int width = SCREENSCALE * m_Emulator->GetGraphicChip().GetWidth();
@@ -218,12 +221,18 @@ void MasterSystem::RenderGame()
         glLoadIdentity();
         glRasterPos2i(-1, 1);
         glPixelZoom(1, -1);
-        if (height == SCREENSCALE*TMS9918A::NUM_RES_VERTICAL)
+        if (height == SCREENSCALE * TMS9918A::NUM_RES_VERTICAL)
+        {
             glDrawPixels(m_Width, m_Height, GL_RGB, GL_UNSIGNED_BYTE, m_Emulator->GetGraphicChip().m_ScreenStandard);
-        else if (height == SCREENSCALE*TMS9918A::NUM_RES_VERT_MED)
+        }
+        else if (height == SCREENSCALE * TMS9918A::NUM_RES_VERT_MED)
+        {
             glDrawPixels(m_Width, m_Height, GL_RGB, GL_UNSIGNED_BYTE, m_Emulator->GetGraphicChip().m_ScreenMed);
-        else if (height == SCREENSCALE*TMS9918A::NUM_RES_VERT_HIGH)
+        }
+        else if (height == SCREENSCALE * TMS9918A::NUM_RES_VERT_HIGH)
+        {
             glDrawPixels(m_Width, m_Height, GL_RGB, GL_UNSIGNED_BYTE, m_Emulator->GetGraphicChip().m_ScreenHigh);
+        }
         
         SDL_GL_SwapBuffers();
     }
