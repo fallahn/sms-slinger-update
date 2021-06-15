@@ -1,0 +1,476 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml" xml:lang="en" lang="en"><head>
+<meta http-equiv="content-type" content="text/html; charset=UTF-8">
+<meta name="description" content="_Emulation Programming_">
+<meta name="keywords" content="_Emulation,Chip8,Gameboy,NES,SNES,Genesis,Master,System,Mega,Drive_">
+<meta name="author" content="CodeSlinger /">
+<link rel="stylesheet" type="text/css" href="sound_files/css.css" media="screen,projection" title="CodeSlinger (screen)">
+<link rel="stylesheet" type="text/css" href="sound_files/print.css" media="print">
+<title>codeslinger.co.uk</title>
+</head>
+
+<body>
+<div>
+<br><br>
+</div>
+
+<div id="container">
+<div id="logo">
+<h1><a href="http://www.codeslinger.co.uk/index.html">codeslinger.co.uk</a></h1>
+</div>
+
+<div id="navitabs">
+<h2 class="hide">Site menu:</h2>
+<a class="navitab" href="http://www.codeslinger.co.uk/index.html">Home</a><span class="hide"> | </span>
+<a class="navitab" href="http://www.codeslinger.co.uk/pages/basics.html">Basics</a><span class="hide"> | </span>
+
+<a class="navitab" href="http://www.codeslinger.co.uk/pages/projects/N64.html">N64</a><span class="hide"> | </span>
+<a class="navitab" href="http://www.codeslinger.co.uk/pages/projects/megadrive.html">Mega Drive/Genesis</a><span class="hide"> | </span>
+<a class="activenavitab" href="http://www.codeslinger.co.uk/pages/projects/mastersystem.html">Master System</a><span class="hide"> | </span>
+<a class="navitab" href="http://www.codeslinger.co.uk/pages/projects/gameboy.html">Gameboy</a><span class="hide"> | </span>
+<a class="navitab" href="http://www.codeslinger.co.uk/pages/projects/chip8.html">Chip8</a><span class="hide"> | </span>
+
+<a class="navitab" href="http://www.codeslinger.co.uk/pages/blog/index.html">Blog</a><span class="hide"> | </span>
+</div>
+	
+<div id="desc">
+<h2>codeslinger.co.uk</h2>
+<p> Sega Master System - Sound.</p>
+
+</div>
+
+<div id="main">
+
+<h3><b>PSG Info:</b></h3>
+<p>
+
+The PSG is a SN79489 made by Texas Instruments. This sound chip has 4 
+different channels, three of which are tone channels and the remaining 
+is a noise channel. It outputs sounds using square waves which is 
+discussed later. This means that it can be programmed to change the 
+volume of each channel as well as the frequency each channel is set to. 
+To change the volumes and frequency of the channels data is written to 
+port 0x7F which is also mirrored at 0x7E.<br><br>
+
+The PSG clock is the same as the Z80 processor clock which is three 
+times slower than the main system clock. Each channel has a counter 
+which is set to its frequency. Every 224KhZ each channels counter is 
+decremented and then the output of all the channels are combined and 
+added to the playback buffer. When one of the counters reaches 0 then it
+ is reset to the value of the channels frequency and the polarity of the
+ output for this channel is changed. This is the basics of square waves.
+
+</p>
+
+<h3><b>Square Waves:</b></h3>
+<p>
+Square Waves get their name because the output from the channels is 
+always one of two values, this is known as the channels current 
+polarity. Signed square waves output values of +1 and -1 and unsigned 
+square waves output +1 and 0. The essence of unsigned square waves and 
+signed square waves are the same but I decided to use signed square 
+waves as combining the outputs of all 4 channels is just a case of 
+adding them together, which is easier than unsigned square waves. The 
+reason why outputting only two values from the channels is a square wave
+ is because the wave pattern looks square. For example if the frequency 
+of channel1 was set to 5 then this is how many 224kHz sample are played 
+on each half of the square wave. So 5 224Khz samples are played at one 
+of the polarity and then another 5 224khz samples are played at the 
+other polarity. This results in a 10 224khz samples being played every 
+full wave. The diagram below helps illustrate this.
+
+</p><p class="block">
+1&nbsp;&nbsp;	
+|#####&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;#####&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;#####<br>
+0&nbsp;&nbsp;	|-----------------------------------------------------------------<br>
+-1&nbsp;		
+|&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;#####&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;#####&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;#####
+
+</p>
+
+As you can see if the frequency was set to 5 then, 5 samples are ouput 
+at polarity 1 and then 5 samples are output at polarity -1. This is why 
+it is known as a square wave because as you can see the pattern of the 
+wave has square edges. Each channels output (+1 or -1) is multiplied by 
+its volume to get its playback data. All 4 channels playback data are 
+then added together (because we are using signed square waves) and this 
+is the final playback data which is then added to the playback buffer. 
+
+<p></p>
+
+<h3><b>PSG Registers:</b></h3>
+<p>
+Each of the 4 channels have 2 registers associated with it, which means 
+there are 8 registers in total. The first channel register is the volume
+ of the channel which is a 4 bit register, the second register is the 
+tone register of the channel (its frequency), these are 10 bit registers
+ with the exception of the noise channel which is 4 bits.<br><br>
+
+When I refer to channel0 im referring to the first channel of the 4, 
+when I refer to channel1 im referring to the second channel etc. The 
+reason is when the data is written to the PSG the channel it is intended
+ for it is represented in binary as 00,01,10 and 11.
+
+The volume registers are set to 0xF on starup and tone registers are set
+ to 0x0.
+
+</p>
+
+<h3><b>PSG channel volume:</b></h3>
+<p>
+
+Although the volume registers are 8 bits the lower 4 bits are only ever 
+used meaning the volume has a range of 0x0 to 0xF. 0x0 means full volume
+ and 0xF means silence. Each volume value gets quieter by 2 decibels so 
+volume 0x1 is 2 decibels quieter than 0x0 and volume 0x2 is 2 decibels 
+quieter than 0x1. As I mentioned in the square wave section we are 
+outputting value of +1 and -1 from the channels which is then multiplied
+ by the channels volume and this value for all 4 channels get added 
+together and added to the playback buffer. It is essential that the 
+value added to the playback buffer does not overflow the maximum and 
+minium values. The most common value type for the playback buffer are 
+signed 16 bit samples. The minimum and maximum values for a signed 16 
+bit number is -32768 to +32767 respectively. This means that when 
+combining the playback values for all 4 channels the value cannot exceed
+ these values. Because we are adding the 4 channels playback values 
+together then we can gaurentee we dont exceed these values by having a 
+maximum channel volume 0f 8000. This means that if all 4 channels were 
+outputting at maximum volume and they were all outputting at positive 
+polarity then they would all output playback volumes of 8000 and when 
+combined together would give a maximum playback value of 32000 which is 
+within the 32767 range. Similary is all channels were on full volume and
+ all the channels polarity was negative then they would all output a 
+playback value of -8000 so when combined together would give a playback 
+value of -32000 which fits within the -32768 range. This will gaurentee 
+whatever the polarity of the channels and whatever their volumes the 
+combined playback value of the channel will never exceed the maximum or 
+minimum range.<br><br>
+
+When we create our emulated PSG chip we need to setup our volume table 
+which is what we will use to know what to multiply the channels output 
+by to get the correct volume. As stated earlier volume 0x0 is the 
+maximum volume and volume 0xF is the minimum volume. Each volume value 
+is less then the previous by 2decibels. This will setup our volume table
+ like so:
+
+</p><p class="code">
+const int MAXVOLUME = 8000 ; <br>
+const float twodb = 0.8f ;<br><br>
+
+float currentVolume = MAXVOLUME ; <br>
+for (int i = 0 ; i &lt; NUMVOLUMES; i++)<br>
+{ <br>
+&nbsp;&nbsp; m_VolumeTable[i] = currentVolume ;<br>
+&nbsp;&nbsp; currentVolume *= twodb; <br>
+} <br><br>
+
+m_VolumeTable[0xF] = 0; // silence
+
+</p>
+
+The definition of m_VolumeTable is:
+
+<p class="code">
+const int NUMVOLUMES = 16 ; // 16 possible values from the 4 bit volume registers<br> 
+WORD m_VolumeTable[NUMVOLUMES] ;
+</p>
+
+<p></p>
+
+<h3><b>Writing data to the PSG:</b></h3>
+<p>
+As stated eariler the game writes sound data to the PSG via ports 0x7F 
+and 0x7E. The PSG has a latch which is the current register where the 
+data byte is designed for. The initially latched register is channel0s 
+tone register. The data byte written takes one of two forms. The first 
+form changes the current latched register and updates its data. The 
+second form is data intended to be written to the currently latched 
+register. The following is how the 2 different data typed should be 
+interpreted: <br><br>
+
+Type1:  1ccrdddd<br>
+Type2:  0xdddddd<br><br>
+
+As you can see the two data bytes can be identified by the value of bit7.<br><br>
+
+Type1:<br>
+If the data byte being written to the PSG port has bit 7 set then this 
+is how the data should be interpreted. Firstly this data byte is 
+designed to update the currently latched register and then update its 
+data. Bits 6 and 5 combined show which channel needs to be latched and 
+bit 4 is whether you need to latch a volume or tone register. A value of
+ 1 means a volume register and a value of 0 means a tone register. The 
+remaining 4 bits are the data that updates the LOWER four bits of the 
+newly latched register. So if the newly latched register is a volume 
+register then the lower 4 bits of the 8 bit register is updated whilst 
+the top 4 bits are left unchanged. However if a tone register is latched
+ then the bottom 4 bits of the 10 bit register is updated leaving the 
+higher 6 bits unchanged except with the noise register as this register 
+is only 4 bits so the entire register is updated.<br><br>
+
+Type2:<br>
+If the currently latched register is a tone register then the lower 6 
+bits of the data byte is used to update the higher 6 bits of the 10 bit 
+register leaving the lower 4 bits unchanged. The exception is again with
+ the noise register as this register is only 4 bits so the lower 4 bits 
+of the data byte completely update the 4 bit noise register.<br>
+If the currently latched register is a volume register then then lower 4
+ bits of the data byte update the lower 4 bits of the 8 bit volume 
+register.<br><br>
+
+To help keep the contents of this page managable my emulation code for 
+this section of the PSG emulation has been added to a text file rather 
+than clutter this page as it is a large piece of code. Please click <a href="http://www.codeslinger.co.uk/pages/projects/mastersystem/snippet_psg_write.txt">here</a>
+ to view the code snippet. This code snippet should be self explanatory 
+with the exception of the variable m_LFSR which I will explain in the 
+noise channel section on this page. This code snippet uses 4 member 
+variables that I have yet to exaplain, these are m_Tones, m_Volume, 
+m_LatchedChannel, m_IsToneLatched. These are defined as:
+
+</p><p class="code">
+bool m_IsToneLatched ;<br>
+BYTE m_LatchedChannel; <br>
+WORD m_Tones[4] ; <br>
+BYTE m_Volumes[4] ;
+</p>
+
+m_LatchedChannel is the idenitifier of the currently latched channel. If
+ it is 0 then the currently latched channel is the first channel 
+(channel0). If it is 1 then the currently latched channel is the second 
+channel (channel1). If it is 3 then the currently latched channel is the
+ noise channel (channel3), this is what the constant TONES_NOISE is set 
+to.<br>
+m_IsToneLatched is a boolean variable to identify if the currently 
+latched channel has its tone register latched or its volume register.<br>
+The tone registers are 10 bits and as there are 4 channels this gives 
+the definition of m_Tones. This register simply stores the sample 
+frequency of each channel.<br>
+m_Volumes is the same as m_Tones except for the 8 bit volume registers.
+
+<p></p>
+
+<h3><b>PSG Tone Playback:</b></h3>
+<p>
+
+Now we have all the channels set correctly from emulating the psg writes
+ we can now start playing sound. I have already explained how the psg 
+creates sound using square waves so this is the implementation of the 
+playback emulation. Because the noise channel works differently from the
+ first three channels I shall discuss the implementation of the noise 
+channel later on. For now I'll emulate the first three channels. There 
+are a few variables used in this code snippet that I have yet to define.
+ <br><br>
+
+Variable m_Polarity which holds each channels polarity which will be either 1 or -1.It is initially set to 1 for each channel. <br>
+m_Counters which originally get sets to the variables frequency and 
+counts down to 0. When it reaches 0 the polarity is changed and the 
+counter is reset back to that channels frequency.<br>
+m_CurrentPosition is where the playback data goes into the 
+playbackbuffer array. When the sound card requests our playback buffer 
+this variable gets set back to 0.<br>
+m_PlaybackBuffer this is the buffer the sound card will request to play. 
+
+</p><p class="code">
+BYTE m_Polarity[4] ;<br>
+int m_Counters[4] ; <br>
+int m_CurrentPosition ; <br>
+signed int m_PlaybackBuffer[1024] ;
+</p>
+
+The reason why the playback buffer has 1024 elements is because I use 
+the SDL audio library and this is how large I told it my playback buffer
+ was so it knows how frequently to request the buffer.<br><br>
+
+<p class="code">
+void SN79489::Playback( float cyclesMac )<br>
+{<br>
+&nbsp; int floor = 0 ;<br>
+&nbsp; if (NotTimeToUpdate(cyclesMac,floor)) <br>
+&nbsp;&nbsp; return ; <br><br>
+
+&nbsp; // tone playback<br>
+&nbsp; signed short int tone = 0 ;<br><br>
+	
+&nbsp; for (int i = 0 ; i &lt; 3; i++)<br>
+&nbsp; {<br>
+&nbsp;&nbsp; if (m_Tones[i] == 0)<br>
+&nbsp;&nbsp;&nbsp; continue ;<br><br>
+
+&nbsp;&nbsp; m_Counters[i]-= floor;<br><br>		
+
+&nbsp;&nbsp; if (m_Counters[i] &lt;= 0) // time to change polarity<br>
+&nbsp;&nbsp; {<br>
+&nbsp;&nbsp;&nbsp; m_Counters[i] = m_Tones[i] ; // reset counter <br>
+&nbsp;&nbsp;&nbsp; m_Polarity[i] *= -1 ; // change polarity<br>
+&nbsp;&nbsp; }<br><br>
+
+&nbsp;&nbsp; tone += m_VolumeTable[m_Volume[i]] * m_Polarity[i] ;<br>
+&nbsp; }<br><br>
+
+&nbsp; signed short int noiseTone = 0 ;<br>
+&nbsp; // code goes here to get noise output<br>
+&nbsp; m_PlaybackBuffer[m_CurrentPosition] = tone + noiseTone ;<br>
+&nbsp; m_CurrentPosition++ ;<br>
+
+}
+</p>
+
+You will notice that sound does not get generated when the tone is set 
+to 0. Hopefully all the above code is clear. I have left a comment where
+ the code to get the noise channel ouput goes. The function 
+NotTimeToUpdate makes sure
+that the playbackbuffer gets updated only every 224khz. If it returns 
+false then no data is calculated, however if it returns true then the 
+"floor" variable
+gets set to how many cycles the counters need to get decremented by.
+
+<p></p>
+
+<h3><b>PSG Noise Playback:</b></h3>
+<p>
+The noise playback slightly differs to the playback of the other three 
+channels. Although a counter is used to change the polarity of the noise
+ channel, instead of feeding this output straight to the playback buffer
+ like the other channels this output is used as an input to a linear 
+feedback shift register to generate noise. The noise channel either 
+generate white noise or periodic noise based on the value bit 2 of the 
+noise register. If the value is 1 then white noise is generated 
+otherwise periodic noise is generated. The linear feedback shift 
+register is a 16bit array which has its bit shifted either left or right
+ (it doesnt matter) everytime the polarity changes from -1 to 1 (at the 
+end of a full square wave). The bit shifted out of the array is then 
+used as input into a mixer. <br><br>
+
+I now refer you to maxims guide on the details of noise generation as he explains it better than I ever could. <a href="http://www.smspower.org/dev/docs/#Sound">LINK</a>
+<br><br>
+
+The following is my implementation of Maxims noise generation:
+
+</p><p class="code">
+
+if (m_Tones[TONES_NOISE] != 0)<br>
+{<br>
+&nbsp; m_Counters[TONES_NOISE] -= floor ;<br><br>
+		
+&nbsp; if (m_Counters[TONES_NOISE] &lt;= 0)<br>
+&nbsp; {<br>
+&nbsp;&nbsp; // the last 2 bits of the noise register contain a freq lookup<br>
+&nbsp;&nbsp; WORD freq = m_Tones[TONES_NOISE] ;<br>
+&nbsp;&nbsp; freq &amp;= 0x3 ;<br><br>
+
+&nbsp;&nbsp; // reset the noise counter <br>
+&nbsp;&nbsp; int count = 0 ;<br>
+&nbsp;&nbsp; switch(freq)<br>
+&nbsp;&nbsp; {<br>
+&nbsp;&nbsp;&nbsp; case 0: count = 0x10; break ;<br>
+&nbsp;&nbsp;&nbsp; case 1: count = 0x20; break ;<br>
+&nbsp;&nbsp;&nbsp; case 2: count = 0x40; break ;<br>
+&nbsp;&nbsp;&nbsp; case 3: count = m_Tones[CHANNEL_TWO]; break ;<br>
+&nbsp;&nbsp; }<br><br>
+
+&nbsp;&nbsp; m_Counters[TONES_NOISE] = count ;<br>
+&nbsp;&nbsp; m_Polarity[TONES_NOISE] *= -1 ;<br><br>
+
+&nbsp;&nbsp; // if the polarity changed from -1 to 1 then shift the random number<br>
+&nbsp;&nbsp; if (m_Polarity[TONES_NOISE] == 1)<br>
+&nbsp;&nbsp; {<br>
+&nbsp;&nbsp;&nbsp; bool isWhiteNoise = TestBit(m_Tones[TONES_NOISE],2) ;<br>
+&nbsp;&nbsp;&nbsp; BYTE tappedBits = BitGetVal( m_Tones[TONES_NOISE], 0) ; ;<br>
+&nbsp;&nbsp;&nbsp; tappedBits |= (BitGetVal( m_Tones[TONES_NOISE], 3) &lt;&lt; 3);<br><br>
+				
+&nbsp;&nbsp;&nbsp; m_LFSR =(m_LFSR&gt;&gt;1) | ((isWhiteNoise?parity(m_LFSR&amp;tappedBits):m_LFSR&amp;1)&lt;&lt;15);<br>
+&nbsp;&nbsp; }<br>
+&nbsp; }<br><br>
+
+&nbsp; noiseTone = m_VolumeTable[m_Volume[TONES_NOISE]] * (m_LFSR &amp; 1) ;<br>
+	
+}
+
+
+</p>
+
+The above code is placed in the Playback function I gave in the previous
+ section on this page where the "code goes here to get noise output" 
+comment is. The parity function returns 1 if the data has an even number
+ of on bits, or 0 if it has
+an odd number if on bits.
+
+
+<p></p>
+
+<h3><b>PSG Timing:</b></h3>
+<p>
+I have said before that the playback function needs to be called at a 
+rate of 224khz. If it is not called at the correct speed then although 
+the tune being
+played will sound correct the tone of the notes will be incorrect. This 
+is what the function NotTimeToUpdate is used for. I use this to 
+calculate if it is
+time to update the playback buffer and reduce the channel counters. The 
+variable "floor" is set to the number that the counters needed to be 
+reduced by. 
+It is almost impossible to call the playback function at exactly 224khz 
+so you must make sure that you keep the precision. 
+This is why floor is an int because although I lose the floating point 
+precision by flooring it to an int, I still keep the float value and 
+take it into consideration next time I call the playback function.
+You will notice that the playback function has an argument for the 
+amount of machineCycles that have been executed since the last time the 
+function was called. As I said earlier the PSG clock is 
+three times slower than the machine clock to the NoTimeToUpdate function
+ immediately divides this value by 3. However the PSG runs at a rate 16 
+times slower than its clock so this value must then by divided by 16.
+</p>
+
+<h3><b>Playing the playback buffer</b></h3>
+<p>
+There are a few ways which you can play the playback buffer. Some of 
+these ways are DirectSound, OpenAl or using the SDL sound library. I 
+personally went for the SDL sound library and am happy with the results.
+ I shall leave the decision of choosing which API up to you like I did 
+with the graphic rendering. If you decide to go with the SDL library 
+then look into the structure SDL_AudioSpec. If you are still having 
+issues look at how I use it by downloading my source code, which can be 
+found on the "Finished Project" link to the right of this page.
+
+
+</p>
+
+</div>
+
+<div id="sidebar">
+
+<h3>Master System Emulation:</h3>
+
+<p>
+<a class="sidelink" href="http://www.codeslinger.co.uk/pages/projects/mastersystem/resources.html">Resources</a><span class="hide"> | </span>
+<a class="sidelink" href="http://www.codeslinger.co.uk/pages/projects/mastersystem/hardware.html">The Hardware</a><span class="hide"> | </span>
+
+<a class="sidelink" href="http://www.codeslinger.co.uk/pages/projects/mastersystem/starting.html">Getting Started</a><span class="hide"> | </span>
+<a class="sidelink" href="http://www.codeslinger.co.uk/pages/projects/mastersystem/memory.html">Memory</a><span class="hide"> | </span>
+
+<a class="sidelink" href="http://www.codeslinger.co.uk/pages/projects/mastersystem/z80.html">Z80</a><span class="hide"> | </span>
+<a class="sidelink" href="http://www.codeslinger.co.uk/pages/projects/mastersystem/vdp.html">VDP</a><span class="hide"> | </span>
+
+<a class="sidelink" href="http://www.codeslinger.co.uk/pages/projects/mastersystem/joypads.html">Joypads</a><span class="hide"> | </span>
+<a class="sidelink" href="http://www.codeslinger.co.uk/pages/projects/mastersystem/interrupts.html">Interrupts</a><span class="hide"> | </span>
+<a class="sidelink" href="http://www.codeslinger.co.uk/pages/projects/mastersystem/sound.html">Sound</a><span class="hide"> | </span>
+<a class="sidelink" href="http://www.codeslinger.co.uk/pages/projects/mastersystem/finished.html">Finished Project</a><span class="hide"> | </span>
+
+</p>
+
+</div>
+    
+<div id="footer">
+Copyright © 2008 codeslinger.co.uk
+</div>
+
+</div>
+
+
+
+
+
+
+
+</body></html>

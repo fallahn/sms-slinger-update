@@ -1,0 +1,139 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml" xml:lang="en" lang="en"><head>
+<meta http-equiv="content-type" content="text/html; charset=UTF-8">
+<meta name="description" content="_Emulation Programming_">
+<meta name="keywords" content="_Emulation,Chip8,Gameboy,NES,SNES,Genesis,Master,System,Mega,Drive_">
+<meta name="author" content="CodeSlinger /">
+<link rel="stylesheet" type="text/css" href="joypads_files/css.css" media="screen,projection" title="CodeSlinger (screen)">
+<link rel="stylesheet" type="text/css" href="joypads_files/print.css" media="print">
+<title>codeslinger.co.uk</title>
+</head>
+
+<body>
+<div>
+<br><br>
+</div>
+
+<div id="container">
+<div id="logo">
+<h1><a href="http://www.codeslinger.co.uk/index.html">codeslinger.co.uk</a></h1>
+</div>
+
+<div id="navitabs">
+<h2 class="hide">Site menu:</h2>
+<a class="navitab" href="http://www.codeslinger.co.uk/index.html">Home</a><span class="hide"> | </span>
+<a class="navitab" href="http://www.codeslinger.co.uk/pages/basics.html">Basics</a><span class="hide"> | </span>
+<a class="navitab" href="http://www.codeslinger.co.uk/pages/projects/N64.html">N64</a><span class="hide"> | </span>
+<a class="navitab" href="http://www.codeslinger.co.uk/pages/projects/megadrive.html">Mega Drive/Genesis</a><span class="hide"> | </span>
+<a class="activenavitab" href="http://www.codeslinger.co.uk/pages/projects/mastersystem.html">Master System</a><span class="hide"> | </span>
+<a class="navitab" href="http://www.codeslinger.co.uk/pages/projects/gameboy.html">Gameboy</a><span class="hide"> | </span>
+<a class="navitab" href="http://www.codeslinger.co.uk/pages/projects/chip8.html">Chip8</a><span class="hide"> | </span>
+<a class="navitab" href="http://www.codeslinger.co.uk/pages/blog/index.html">Blog</a><span class="hide"> | </span>
+</div>
+	
+<div id="desc">
+<h2>codeslinger.co.uk</h2>
+<p> Sega Master System - Joypads.</p>
+
+</div>
+
+<div id="main">
+
+<h3><b>Joypads:</b></h3>
+<p>
+
+This is one of the easiest devices to emulate on the SMS. Each joypad 
+button on the joypad will have its own bit in a Joypad status register. 
+There are two joypad status registers which the game can read by reading
+their appropriate port numbers. These ports are write protected so you 
+will only ever get games
+trying to read from them not write to them. PortA is port number 0xDC 
+and is mirrored at 0xC0. PortB is port number 0xDD and is mirrored at 
+0xC1. This is what the bits for each of the two bytes representing the 
+states mean<br><br>
+
+<b>PortA:</b><br>
+Bit 7: Joypads 2 down button <br>
+Bit 6: Joypads 2 up button<br>
+Bit 5: Joypads 1 Fire B<br>
+Bit 4: Joypads 1 Fire A<br>
+Bit 3: Joypads 1 Right Button<br>
+Bit 2: Joypads 1 Left Button<br>
+Bit 1: Joypads 1 Down Button<br>
+Bit 0: Joypads 1 Up Button<br><br> 
+
+<b>PortB:</b><br>
+Bit 7: Unused... Lightgun? <br>
+Bit 6: Unused... Lightgun? <br>
+Bit 5: Unused <br>
+Bit 4: Reset Button<br>
+Bit 3: Joypads 2 Fire B<br>
+Bit 2: Joypads 2 Fire A<br>
+Bit 1: Joypads 2 Right Button<br>
+Bit 0: Joypads 2 Left Button<br><br>
+
+However each bit of these two bytes is 1 when a button is NOT pressed. 
+When a button is pressed the bit is 0. Also notice how Joypad2 has 
+states in both PortA and PortB. The best way to emulate the joypads is 
+to have two BYTE variables
+which is initially set to 0xFF (all the 1s will be set meaning that no 
+buttons are pressed). Then whenever a keyboard button is pressed change 
+the corresponding bit in either PortA or PortB to be 0 and when the key 
+is released change it
+back to 1. Then whenever the game wishes to check joypad input it will 
+read either IO port 0xDC or 0xDD and the emulator will return either the
+ PortA byte or PortB byte respectively. 
+
+</p>
+
+<h3><b>Reset Button:</b></h3>
+<p>
+
+The last part of joypad emulation is the Reset button. The reset button 
+triggers a none maskable interrupt, which means there is no way the game
+ can prevent this interrupt from being registered. Even if all 
+interrupts are disabled a none maskable
+interrupt will still get serviced. I will explain in greater detail the 
+interrupt system in the next section of the tutorials, so for now just 
+set a flag whenever the reset button is pressed (but not released). This
+ will signal to the emulator that a reset
+interrupt must be serviced asap.
+
+</p>
+
+
+</div>
+
+<div id="sidebar">
+
+<h3>Master System Emulation:</h3>
+
+<p>
+<a class="sidelink" href="http://www.codeslinger.co.uk/pages/projects/mastersystem/resources.html">Resources</a><span class="hide"> | </span>
+<a class="sidelink" href="http://www.codeslinger.co.uk/pages/projects/mastersystem/hardware.html">The Hardware</a><span class="hide"> | </span>
+<a class="sidelink" href="http://www.codeslinger.co.uk/pages/projects/mastersystem/starting.html">Getting Started</a><span class="hide"> | </span>
+<a class="sidelink" href="http://www.codeslinger.co.uk/pages/projects/mastersystem/memory.html">Memory</a><span class="hide"> | </span>
+
+<a class="sidelink" href="http://www.codeslinger.co.uk/pages/projects/mastersystem/z80.html">Z80</a><span class="hide"> | </span>
+<a class="sidelink" href="http://www.codeslinger.co.uk/pages/projects/mastersystem/vdp.html">VDP</a><span class="hide"> | </span>
+<a class="sidelink" href="http://www.codeslinger.co.uk/pages/projects/mastersystem/joypads.html">Joypads</a><span class="hide"> | </span>
+<a class="sidelink" href="http://www.codeslinger.co.uk/pages/projects/mastersystem/interrupts.html">Interrupts</a><span class="hide"> | </span>
+<a class="sidelink" href="http://www.codeslinger.co.uk/pages/projects/mastersystem/sound.html">Sound</a><span class="hide"> | </span>
+<a class="sidelink" href="http://www.codeslinger.co.uk/pages/projects/mastersystem/finished.html">Finished Project</a><span class="hide"> | </span>
+
+</p>
+
+</div>
+    
+<div id="footer">
+Copyright © 2008 codeslinger.co.uk
+</div>
+
+</div>
+
+
+
+
+
+
+</body></html>

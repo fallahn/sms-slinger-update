@@ -1,0 +1,1246 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml" xml:lang="en" lang="en"><head>
+<meta http-equiv="content-type" content="text/html; charset=UTF-8">
+<meta name="description" content="_Emulation Programming_">
+<meta name="keywords" content="_Emulation,Chip8,Gameboy,NES,SNES,Genesis,Master,System,Mega,Drive_">
+<meta name="author" content="CodeSlinger /">
+<link rel="stylesheet" type="text/css" href="vdp_files/css.css" media="screen,projection" title="CodeSlinger (screen)">
+<link rel="stylesheet" type="text/css" href="vdp_files/print.css" media="print">
+<title>codeslinger.co.uk</title>
+</head>
+
+<body>
+<div>
+<br><br>
+</div>
+
+<div id="container">
+<div id="logo">
+<h1><a href="http://www.codeslinger.co.uk/index.html">codeslinger.co.uk</a></h1>
+</div>
+
+<div id="navitabs">
+<h2 class="hide">Site menu:</h2>
+<a class="navitab" href="http://www.codeslinger.co.uk/index.html">Home</a><span class="hide"> | </span>
+<a class="navitab" href="http://www.codeslinger.co.uk/pages/basics.html">Basics</a><span class="hide"> | </span>
+
+<a class="navitab" href="http://www.codeslinger.co.uk/pages/projects/N64.html">N64</a><span class="hide"> | </span>
+<a class="navitab" href="http://www.codeslinger.co.uk/pages/projects/megadrive.html">Mega Drive/Genesis</a><span class="hide"> | </span>
+<a class="activenavitab" href="http://www.codeslinger.co.uk/pages/projects/mastersystem.html">Master System</a><span class="hide"> | </span>
+<a class="navitab" href="http://www.codeslinger.co.uk/pages/projects/gameboy.html">Gameboy</a><span class="hide"> | </span>
+<a class="navitab" href="http://www.codeslinger.co.uk/pages/projects/chip8.html">Chip8</a><span class="hide"> | </span>
+
+<a class="navitab" href="http://www.codeslinger.co.uk/pages/blog/index.html">Blog</a><span class="hide"> | </span>
+</div>
+	
+<div id="desc">
+<h2>codeslinger.co.uk</h2>
+<p> Sega Master System - VDP.</p>
+
+</div>
+
+<div id="main">
+
+<h3><b>VDP Info:</b></h3>
+<p>
+Right before you get started reading this one, make sure you have a few 
+cans of cokes at the ready and you have your thinking cap on. You may 
+also want a nap before reading this as it is a real meaty section of the
+ site.<br><br>
+
+Emulating the Texas Instrument TMS9918a can be quite daunting at first 
+compared to the Gameboy VDP as there is a lot more to it. However if you
+ break down each part of the VDP it isnt too bad. Lets start with the 
+VDP memory map:
+
+</p><p class="block">
+0x0000 - 0x1FFF = Sprite / tile patters (numbers 0 to 255) <br>
+0x2000 - 0x37FF = Sprite / tile patters (numbers 256 to 447)<br>
+0x3800 - 0x3EFF = Name Table <br>
+0x3F00 - 0x3FFF = Sprite Info Table
+</p>
+
+At first the memory map seems straight forward but there is one catch 
+which is, the name table and sprite info table do not always begin at 
+address 0x3800 and 0x3F00 respectively and can be changed (which we will
+ see later). There is also the colour ram (CRAM) which can hold two lots
+ of 16 colour palettes. This gives us our VDP memory declarations of:
+
+<p class="code">
+BYTE m_VRAM[0x4000] ;<br>
+BYTE m_ColourRam[32] ;
+</p>
+
+If you are unsure of how the basics of tile and sprite rendering works 
+it is really quite simple. The screen is made up of "tiles" which 
+represent the background (so for sonic it will be the ground he runs on,
+ the sky, the palm trees etc). Each tile in memory is made up of 64 
+pixels in the form of 8
+horizontal pixels and 8 vertical pixels. To draw the background you read
+ the contents of the name table which will give you all the tile numbers
+ from left to right and up to down of the screen. Each tile number can 
+then be looked up in the sprite/tile patterns number which gives the 
+colour of each 64 pixels of that tile. The screen is also made up of 
+sprites which are the active objects (using the sonic example again it 
+would be sonic, the bad guys, the rings etc). The sprites are usually 
+drawn on top of the background and can be 8x8 in size like the 
+background tiles, or 16x16 in size. It is also possible to zoom sprites 
+which doubles the sprite in size so 8x8 becomes 16x16 and 8x16 becomes 
+32x32. The sprite info table specifies where on screen the sprite 
+pattern it is referring to is drawn. The sprite pattern is looked up in 
+the sprite pattern table and is drawn the same was as the background.<br><br>
+
+The VDP has 11 control registers and one status register. I shall go 
+over the control registers in more detail later. The status register is a
+ BYTE in size but only bits 5-7 are used. Here is the layout of the 
+status register but I shall go through their meanings later.
+
+<p class="block">
+
+BIT 7 = VSync Interrupt Pending<br>
+BIT 6 = Sprite Overflow<br>
+BIT 5 = Sprite Collision<br>
+BIT 4-0 = Unused
+
+</p>
+
+The VDP can have its mode changed which will change how the tiles and 
+sprites are rendered and also how the status register and the control 
+registers are interpreted. The SMS only uses mode 2 and mode 4 so I 
+shall only discuss these two. All of the SMS games use mode 4 apart from
+ F-16 Fighter which uses mode 2.<br><br>
+
+Like all the hardware on the SMS the CPU communicates with the VDP by 
+ports and it is the ports that the programmer uses to control the VDP.
+
+<p class="block">
+0x7E = VCounter (read only)<br>
+0x7F = HCounter( read only)<br>
+0xBE = Data Port (read/write)<br>
+0xBF = Control Port ( read/write).
+</p>
+
+If the ROM ever tries to write to ports 0x7E-0x7F then it is infact 
+communicating with the sound chip and not the VDP. When reading from 
+ports 0x7E-0x7F then it is the VDP not the sound chip. If reading from 
+port 0x7E then the vcounter of the vdp is returned (this is what current
+ line of the active or inactive frame is being drawn). Reading port 0x7F
+ returns which pixel of the current line being drawn (the vcounter) is 
+being drawn. I shall discuss the other two ports (data and control) 
+later.
+
+<p></p>
+
+<h3><b>Interrupts:</b></h3>
+<p>
+The screen draws itself at a rate of 50Hz or 60hz (depending whether 
+it's PAL or NTSC, discussed later). This means the screen redraws itself
+ 50 or 60 times a second. Each one of these screen redraws is known as a
+ frame. Each frame has an active period and an inactive period. The 
+active period is when the VDP is actually drawing one of the visible 
+lines of the screen and the inactive period is when it has drawn all the
+ visible lines of the screen. The inactive period is very important to 
+programmers because they can programme the VDP in ways they couldnt 
+while it was in an active period (like change the vertical scroll value,
+ discussed later). So whenever the VDP leaves the active period and 
+enters the inactive period it tries to signal an interrupt so the ROM 
+becomes aware of this. As you will see in the Interrupts section the VDP
+ interrupts can be ignored. When the vdp enters the inactive display 
+period it sets bit 7 of the status register to show there is a VSync 
+interrupt pending. However a vsync interrupt is only requested if Bit7 
+of the status flag is set and the bit 5 of control register 1 is set 
+(this is the flag set by the programmer to enable vertical sync 
+interrupts, discussed later). If both of these flags are set then the 
+VDP requests a vsync interrupt and the cpu will either respond to it or 
+ignore it.<br><br>
+
+
+There is another vdp interrupt called the line interrupt. This is a 
+value set by the programmer which counts down during the active display 
+period (and the first line of the inactive display period)each time the 
+vdp moves onto a new scanline. This is so the programmer can be informed
+ of when the vdp starts drawing a specific scanline. When the line 
+counter goes below zero then the vdp requests an interrupt (only if the 
+line interrupts are enabled by setting bit 4 of control register 0) and 
+the line counter is reset to the value of register 10. If the cpu 
+decides to ignore the vdp interrupt then the request is lost so this 
+interrupt is either handled straight away or not at all. The value of 
+the line counter is set to the value of register 10 however the line 
+counter is only set to the value of register 10 when the current 
+scanline is past the FIRST scanline of the inactive display period.<br><br>
+
+I shall show how to implement both interrupts in the "Update Cycle" section of this page.
+
+</p>
+
+<h3><b>Regions:</b></h3>
+<p>
+The two different regions are PAL and NTSC. Throughout the rest of this 
+document I shall be working with NTSC however this section will give the
+ details for both. As I have already explained each VDP frame consists 
+of an active section and an inactive section. The amount of 
+active+inactive gives us the total amount of scanlines each frame has. 
+PAL has 313 scanlines and NTSC has 262. Because of this difference the 
+amount of NTSC frames drawn every second is more than PAL. NTSC can draw
+ 60 frames a second and PAL can draw 50. Because both regions have 
+different number of scanlines the amount of scanlines in the active 
+period and the inactive period differ for each region. Not only this but
+ each region can change its screen resolution (meaning the amount of 
+active screen scanlines change but not the total number of scanlines). I
+ shall refer to the three different screen resolutions as "small", 
+"medium" and "large". The default used by the majority of games is 
+"small". The astute amongst you will have noticed that if reading port 
+0x7E returns a byte which is the vcounter yet the number of total 
+scanlines is 262 or 313 (depending on the regions) then not all 
+scanlines can be returned because the maximum value of an unsigned byte 
+is 255. So if the vcounter is 260 then this cannot be represented within
+ a bytes range. The answer is quite simple. Although the VDP will go 
+through 262 or 313 scanlines it can only do this by going over scanlines
+ more than once in each frame. This means the vcounter will go from 0 to
+ 255 but some of these will be repeated giving a total of 262 or 313. To
+ help explain this lets have a look at how the small ntsc resolution is 
+broken down:
+
+</p><p class="block">
+NTSC 256x192 (small)<br>
+0-191 = active display<br>
+192-255 = inactive display<br>
+Vcounter values = 0x0-0xDA, 0xD5-0xFF
+
+</p>
+
+As you can see the visible resolution of the screen is 256x192 pixels 
+which is the active display period. The values 192 to 255 is the 
+inactive display period. When the vcounter gets to 0xDA it jumps back to
+ 0xD5 and continues to 0xFF, this is how the extra sanlines are made up 
+to get a total of 262. The following is how the other regions and 
+settings work:
+
+<p class="block">
+NTSC 256x224(medium)<br>
+0-223 = active display<br>
+224-255 = inactive display<br>
+VCounter values = 0x0-0xEA, 0x0E5-0xFF<br><br>
+
+NTSC 256x240(large)<br>
+doesnt work in NTSC<br><br>
+
+PAL 256x224(small)<br>
+0 - 191 = active display <br>
+192 - 255 = inactive display<br>
+VCounter Values = 0x0-0xF2,0xBA-0xFF<br><br>
+
+PAL 256-224(medium)<br>
+0-223 = active display<br>
+224-255 = inactive display<br>
+VCounter values = 0x0-0xFF, 0x0-0x02, 0xCA-0xFF<br><br>
+
+PAL 256x240(large)<br>
+0-239 = active display<br>
+240-255 = inactive display<br>
+VCounter Values = 0x0-0xFF,0-0x0A,0xD2,0xFF
+
+</p>
+
+<p></p>
+
+<h3><b>Control Registers:</b></h3>
+<p>
+There are 11 control registers and they are write only. You will see in 
+the next section how data is written to VRAM, CRAM and the control 
+registers. Each register is a byte in size, and they all have different 
+purposes. The majority of the bits in the register are unused so i'll 
+just show the bits that are used for each register and what they do.
+
+</p><p class="block">
+Register 0x0:<br>
+Bit7 = If set then vertial scrolling for columns 24-31 are disabled<br>
+Bit6 = If set then horizontal scrolling for colums 0-1 are disabled<br> 
+Bit5 = If set then column 0 is set to the colour of register 0x7<br>
+Bit4 = If set then line interrupt is enabled<br>
+Bit3 = If set sprites are moved left by 8 pixels<br>
+Bit2 = If set use Mode 4<br>
+Bit1 = If set use Mode 2. Must also be set for mode4 to change screen resolution<br><br>
+
+Register 0x1:<br>
+Bit6 = If set the screen is enabled<br>
+Bit5 = If set vsync interrupts are enabled<br>
+Bit4 = If set active display has 224 (medium) scanlines. Reg 0 bit1 must be set<br>
+Bit3 = If set active display has 240 (large) scanlines. Reg0 bit1 must be set<br>
+Bit1 = If set sprites are 16x16 otherwise 8x8<br>
+Bit0 = If set sprites are zoomed (double in size)<br><br>
+
+Register 0x2:<br>
+Bit3 = Bit13 of the name base table address<br>
+Bit2 = Bit12 of the name base table address<br>
+Bit1 = Bit11 of the name base table address if resolution is "small" otherwise unused<br><br>
+
+As I mentioned earlier both the name table and the sprite info table can
+ be moved and this is the register that sets where the name table is. To
+ convert from this register to the name table you need to logically and 
+this register with 0xE which will get the results of bits 3-1 (including
+ bit 0 which is "off"), you then shift this 10 times so Bit3 aligns with
+ Bit 13. So if bits 3-0 are 1110, then this would get shifted left 10 
+times to give 11100000000000 which gives the name table address of 
+0x3800. However it works slightly differently if you are not using the 
+"small" resolution (meaning register 1 has bits 3 or 4 set). You need to
+ logically and register 2 with 0xC and shift it left 10 places. You then
+ need to logically or this with 0x700 to get the name table. For example
+ if bits 3-0 is 1110 you and this with 0xC to give 1100, left shift 10 
+and logically or with 0x700 to give name table address 0x3700. <br><br>
+
+Register 0x3 and 0x4:<br>
+Unused<br><br>
+
+Register 0x5:<br>
+Bit 6 = Bit13 of sprite info base table<br>
+Bit 5 = Bit12 of sprite info base table<br>
+Bit 4 = Bit11 of sprite info base table<br>
+Bit 3 = Bit10 of sprite info base table<br>
+Bit 2 = Bit9 of sprite info base table<br>
+Bit 1 = Bit8 of sprite info base table<br><br>
+
+This register gives the base address of the sprite attribute table. As 
+bits 7 and 0 are ignored you need to logical and this register with 
+binary value 01111110 (hex 0x7E) and then shift it left 7 places so the 
+bits align<br><br>
+
+Reister 0x6:<br>
+Bit 2 = If set sprites use tiles in memory 0x2000 (tiles 256..511), else memory 0x0 (tiles 0 - 256)<br><br>
+
+Register 0x7:<br>
+Bits 3-0 = Defines the colour to use for the overscan order<br><br>
+
+Register 0x8:<br>
+The entire 8 bit register is the Background X Scrolling position (explained later)<br><br>
+
+Register 0x9:<br>
+The entire 8 bit register is the Background Y Scrolling position (explained later).<br><br>
+
+Register 0xA:<br>
+The entire 8 bit register is what the line counter should be set to (explained later)<br><br>
+
+All the registers can be emulated as simple as this:<br>
+BYTE m_VDPRegisters[11] ;
+</p>
+
+<p></p>
+
+<h3><b>The ports:</b></h3>
+<p>
+Data needs to be written to the vdp in three places. VRAM, CRAM and the 
+VDP Registers. There are two ports used for writing data to the vdp. 
+Port 0xBE is where the data to be stored in VRAM, CRAM or the VDP 
+registers is written to. Port 0xBF controls which of these three memory 
+regions the data written to port 0xBE is intended for.<br><br>
+
+The way the control port (0xBF) works is by the programmer writing two 
+bytes of data to this port, this is called the control word. The way the
+ control word function is bits 15-14 contain where the data written to 
+port 0xBE is for, this is called the control word code. Bits 13-0 is 
+interpreted based on what the control word code is set to. This is what 
+the values of the control word code represent:
+
+</p><p class="block">
+0 = Read a byte of data from the address register and store it in the 
+read buffer. Increment the address register. With this control word code
+ any writes to port 0xBE will go to VRAM at the memory pointed to by the
+ newly incremented address register<br>
+1 = Writing to port 0xBE will go to VRAM at the memory pointed to by the address register<br>
+2 = Writing to port 0xBE will go to VRAM at the memory pointed to by the
+ address register. However this control word code will also write data 
+to the vdp registers<br>
+3 = Writing to port 0xBE will go to CRAM
+</p>
+
+You will notice that I mention the address register. The address 
+register is bits 13-0 of the control register. The address register 
+points to the memory address in VRAM where writing data to port 0xBE 
+will be written. From the memory map we know VRAM is 0x4000 bytes, this 
+means the address register will wrap when it exceeds 0x3FFF. The read 
+buffer is a byte variable which is returned when the rom reads from port
+ 0xBE. CRAM works the same as writing to VRAM except 
+as it is only 32 bytes in size you only use bits 5-0 of the address 
+register to the the pointer in CRAM. As I mentioned control word code 2 
+it will also update there and then one of the vdp register. This works 
+by bits 11-8 giving the vdp register to update and bits 7-0 giving the 
+byte to update the register with.<br><br>
+
+The one point I belive I still need to make clear before I show the 
+implementation of port 0xBF writes is how the control word is updated. 
+Because the control word is 2 byes and you can only write 1 byte at a 
+time the control word gets updated in two stages. The first byte written
+ updates the least significant byte of the control word (bits 7-0) and 
+the second byte written updates the most significant byte (bits 15-8). 
+It is only when the second byte is written that action is taken on the 
+control word code. If the first byte is written but not the second byte 
+the control word is a mixture of the new byte and the old byte. As you 
+will see later it is possible to reset the control word so the next byte
+ rewritten is the first byte even though it might have previously been 
+waiting for the second byte to be written.
+
+
+<p class="code">
+WORD m_ControlWord ;<br>
+BIT m_IsSecondControlWrite ;<br>
+BYTE m_ReadBuffer ;<br>
+void TMS9918A::WriteVDPAddress(BYTE data)<br>
+{<br>
+&nbsp;&nbsp; if (m_IsSecondControlWrite)<br>
+&nbsp;&nbsp; {<br>
+&nbsp;&nbsp;&nbsp;&nbsp; // update the top byte<br>
+&nbsp;&nbsp;&nbsp;&nbsp; m_ControlWord &amp;= 0xFF ;<br>
+&nbsp;&nbsp;&nbsp;&nbsp; m_ControlWord |= data &lt;&lt; 8 ;<br>
+&nbsp;&nbsp;&nbsp;&nbsp; m_IsSecondControlWrite = false ;<br><br>
+
+&nbsp;&nbsp;&nbsp;&nbsp; // act on the control code<br>
+&nbsp;&nbsp;&nbsp;&nbsp; switch (GetCodeRegister())<br>
+&nbsp;&nbsp;&nbsp;&nbsp; {<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; case 0: m_ReadBuffer = m_VRAM[GetAddressRegister()];<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; IncrementAddress(); break ;<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; case 2: SetRegData() ;break ;<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; default: break ;<br>
+&nbsp;&nbsp;&nbsp;&nbsp; }<br>
+&nbsp;&nbsp; }<br><br>
+
+&nbsp;&nbsp; else<br>
+&nbsp;&nbsp; {<br>
+&nbsp;&nbsp;&nbsp;&nbsp; // update lower byte<br>
+&nbsp;&nbsp;&nbsp;&nbsp; m_IsSecondControlWrite = true ;<br>
+&nbsp;&nbsp;&nbsp;&nbsp; m_ControlWord &amp;= 0xFF00 ;<br>
+&nbsp;&nbsp;&nbsp;&nbsp; m_ControlWord |= data ;<br>
+&nbsp;&nbsp; }<br>
+}<br><br>
+
+void TMS9918A::IncrementAddress( )<br>
+{<br>
+&nbsp;&nbsp; // wrap address register at 0x3FFF<br>
+&nbsp;&nbsp; if (GetAddressRegister() == 0x3FFF)<br>
+&nbsp;&nbsp;&nbsp;&nbsp; m_ControlWord &amp;= 0xC000 ; // keep coontrol word code unchanged<br>
+&nbsp;&nbsp; else<br>
+&nbsp;&nbsp;&nbsp;&nbsp; m_ControlWord++ ;<br>	
+}<br><br>
+
+WORD TMS9918A::GetAddressRegister( ) const<br>
+{<br>
+&nbsp;&nbsp; return m_ControlWord &amp; 0x3FFF ;<br>
+}<br><br>
+
+void TMS9918A::SetRegData( )<br>
+{<br>
+&nbsp;&nbsp; // the new reg data is the lower byte<br>
+&nbsp;&nbsp; BYTE data = m_ControlWord &amp; 0xFF ;<br>
+&nbsp;&nbsp; // reg is lower 4 bits of upper byte <br>
+&nbsp;&nbsp; BYTE reg = m_ControlWord &gt;&gt; 8 ;<br>
+&nbsp;&nbsp; reg &amp;= 0xF ;<br><br>
+
+&nbsp;&nbsp; if (reg &gt; 11)<br>
+&nbsp;&nbsp;&nbsp;&nbsp; return ;<br><br>
+
+&nbsp;&nbsp; m_VDPRegisters[reg] = data ;<br><br>
+
+&nbsp;&nbsp; // is this reg write enabling vsync interrupts?<br>
+&nbsp;&nbsp; // If so do we have an irq pending?<br>
+&nbsp;&nbsp; if (reg == 1)<br>
+&nbsp;&nbsp; {<br>
+&nbsp;&nbsp;&nbsp;&nbsp; if (TestBit(m_Status,7) &amp;&amp; IsRegBitSet(1,5))<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; m_RequestInterupt = true ;<br>
+&nbsp;&nbsp; }<br>
+}<br><br>
+
+
+BYTE TMS9918A::GetCodeRegister() const <br>
+{ <br>
+&nbsp;&nbsp; WORD w = m_ControlWord &gt;&gt; 14 ; <br>
+&nbsp;&nbsp; return (BYTE)w ;<br>
+}
+
+</p>
+
+Hopefully there is nothing scary above the above few functions. I'll 
+give you a quick run down on the function WriteVDPAddress. This is the 
+function where writing a byte of data to 0xBF will end up calling. The 
+byte being written will either update the the lower byte of the control 
+word or the higher byte depending on the boolean m_IsSecondControlWrite.
+ If it is the higher byte being written then this byte will also contain
+ the new control word code and depending on the code some action may 
+need to be taken. If the control code is 0 then the read buffer needs to
+ be updated to contents of vram pointed to by the address register and 
+then the address register is incremented. If the control word code is 2 
+then we need to update one of the vdp register values. If the control 
+word is 1 or 3 then we dont need to take action because the address 
+register is up to date pointing to the correct memory location in either
+ vram or cram and then writing to port 0xBE will actually be responsible
+ for writing the data to vram or cram.<br><br>
+
+I have finished discussing emulation of port 0xBF (the control port) and
+ need to explain how the 0xBE port (data port) is emulated. This is the 
+port that will write values to either VRAM or CRAM depending on the 
+control word code. It is really quite simple to emulate as we know 
+whether to write to eithr VRAM or CRAM based on the control word code 
+and we know where to write those values to based on the control word 
+address. After a byte is written to memory via port 0xBE the control 
+address register is incremented. This is really usefull for the 
+programmer because they can write lots of data to memory without 
+constantly updating the control word address to point to the next area 
+of memory. When a value is written to memory will set the read buffer to
+ the value being written. Writing to the data port will also reset the 
+m_IsSecondControlWrite flag to false so any more writes to the control 
+port will start updating the control word from the least significant 
+byte.
+
+<p class="code">
+
+void TMS9918A::WriteDataPort(BYTE data)<br>
+{<br>
+&nbsp;&nbsp; m_IsSecondControlWrite = false ;<br>
+&nbsp;&nbsp; BYTE code = GetCodeRegister( ) ;<br><br>
+
+&nbsp;&nbsp; switch (code)<br>
+&nbsp;&nbsp; {<br>
+&nbsp;&nbsp;&nbsp;&nbsp; case 0: m_VRAM[ GetAddressRegister() ] = data ; break ; <br>
+&nbsp;&nbsp;&nbsp;&nbsp; case 1: m_VRAM[ GetAddressRegister() ] = data ; break ;<br>
+&nbsp;&nbsp;&nbsp;&nbsp; case 2: m_VRAM[ GetAddressRegister() ] = data ; break ;<br>
+&nbsp;&nbsp;&nbsp;&nbsp; case 3: m_CRAM[ GetAddressRegister() &amp; 31 ] = data ; break ;<br>
+&nbsp;&nbsp; }<br><br>
+
+&nbsp;&nbsp; m_ReadBuffer = data ;<br><br>
+
+&nbsp;&nbsp; IncrementAddress( ) ;<br>
+}
+
+</p>
+
+The emulation of the data port is really quite simple. If you are 
+wondering why writing to CRAM gets the address register and logicall and
+ it with 31 it is because only the first 5 bits of the address register 
+is used for CRAM because CRAM is only 32 bytes in size.<br><br>
+
+We now know what happens when the VDP ports are written to but what 
+happens when they are read? Reading the data port (0xBE) return the read
+ buffer. It then assigns a new value to the read buffer which is the 
+incremented address of the control word address. The reason why it is 
+incremented on read is the same as why it is incrememnted on write, this
+ is so the programmer doesnt have to keep updating the control word to 
+point to the next location in memory. Reading the control port (0xBF) 
+returns the status register which I have previously discussed. Only Bits
+ 7-5 are used in the status register and these all get reset when 
+reading the conrol port, except when using vdp mode 2 which only resets 
+bits 7 and 5. As well as resetting the status register when reading the 
+control port the m_IsSecondControlWrite is also reset along with IRQs.
+
+
+<p class="code">
+
+BYTE TMS9918A::GetStatus( )<br>
+{<br>
+&nbsp;&nbsp; BYTE res = m_Status ;<br>
+&nbsp;&nbsp; if (GetVDPMode() == 2)<br>
+&nbsp;&nbsp; {<br>
+&nbsp;&nbsp;&nbsp;&nbsp; m_Status &amp;= 0x2F; // turn off bits 7 and 5<br>
+&nbsp;&nbsp; }<br>
+&nbsp;&nbsp; else<br>
+&nbsp;&nbsp; {<br>
+&nbsp;&nbsp;&nbsp;&nbsp; m_Status &amp;= 0x1F; // turn off top 3 bits<br>
+&nbsp;&nbsp; }<br>
+&nbsp;&nbsp; m_IsSecondControlWrite = false ;<br>
+&nbsp;&nbsp; m_RequestInterupt = false ;<br><br>
+
+&nbsp;&nbsp; return res ;<br>
+}<br><br>
+
+BYTE TMS9918A::ReadDataPort( )<br>
+{<br>
+&nbsp;&nbsp; m_IsSecondControlWrite = false ;<br><br>
+
+&nbsp;&nbsp; BYTE res = m_ReadBuffer ;<br><br>
+
+&nbsp;&nbsp; m_ReadBuffer = m_VRAM[ GetAddressRegister() ]; break ;	<br><br>
+
+&nbsp;&nbsp; IncrementAddress( ) ;<br><br>
+
+&nbsp;&nbsp; return res ;<br>
+}
+
+</p>
+
+
+<p></p>
+
+
+<h3><b>Timing:</b></h3>
+<p>
+The VDP is half the speed of the machine clock. In order to move onto 
+the next scanline we need to know how long should be spent drawing each 
+scanline. This is where we need to emulate the horizontal counter 
+(hcounter). The hcounter is increased at the same rate as the machine 
+clock meaning forevery vdp clock the hcounter is incrememnted twice. The
+ hcounter tackes 684 machine cycles before moving onto the next 
+scanline. Because we know how long to spend on each scanline and we know
+ how many scanlines are in the a frame it is relatively straight forward
+ to get the vdp timing correct. All we need to do is make sure to move 
+onto the next scanline at the correct time and we draw the correct 
+amount of scanlines. Once the frame is drawn we then start drawing the 
+next frame only when the required time has passed (1/50th of a second 
+for PAL at 50hz and 1/60th of a second for NTSC at 60hz), however this 
+is something we have already emulated in the main emulation update cycle
+ (see "The Hardware" chapter of these tutorials). In the next section 
+below I'll show how to emulate this along with everything else that the 
+update of the vdp needs to do.
+
+</p>
+
+<h3><b>Update Cycle:</b></h3>
+<p>
+</p><p class="code">
+void TMS9918A::Update(float nextCycle) <br>
+{<br>
+&nbsp;&nbsp; m_RequestInterupt = false ;<br>
+&nbsp;&nbsp; WORD hcount = m_HCounter ;<br>
+&nbsp;&nbsp; bool nextline = false ;<br>
+&nbsp;&nbsp; m_IsVBlank = false ;<br>
+&nbsp;&nbsp; m_Refresh = false ;<br><br>
+
+&nbsp;&nbsp; m_RunningCycles += nextCycle ;<br><br>
+
+&nbsp;&nbsp; // ignore everything after the decimal point<br>
+&nbsp;&nbsp; int clockInfo = floorf(m_RunningCycles) ;<br><br>
+
+&nbsp;&nbsp; // The machine cycle is twice the speed of the vdp and this is the<br>
+&nbsp;&nbsp; // speed the hcounter increments at<br>
+&nbsp;&nbsp; int cycles = clockInfo * 2 ;<br><br>
+
+&nbsp;&nbsp; // are we moving off this scanline onto the next?<br>
+&nbsp;&nbsp; if ((hcount + cycles) &gt; 684)<br>
+&nbsp;&nbsp;&nbsp;&nbsp; nextline = true ;<br><br>
+
+&nbsp;&nbsp; // if we are starting a new scanline reset the hcounter<br>
+&nbsp;&nbsp;&nbsp;&nbsp; m_HCounter = (m_HCounter + cycles) % 685;<br><br>
+
+&nbsp;&nbsp; // we are moving onto the next scanline<br>
+&nbsp;&nbsp; if (nextline)<br>
+&nbsp;&nbsp; {<br>
+&nbsp;&nbsp;&nbsp;&nbsp; // store current scanline<br>
+&nbsp;&nbsp;&nbsp;&nbsp; BYTE vcount = m_VCounter ;<br>
+&nbsp;&nbsp;&nbsp;&nbsp; m_VCounter++ ; // move onto next scanline<br><br>
+
+&nbsp;&nbsp;&nbsp;&nbsp; // are we coming to the end of the vertical refresh?<br>
+&nbsp;&nbsp;&nbsp;&nbsp; // if so we are starting a new frame from scanline 0<br>
+&nbsp;&nbsp;&nbsp;&nbsp; if (vcount == 255)<br>
+&nbsp;&nbsp;&nbsp;&nbsp; {<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; m_VCounter = 0 ;<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; m_VCounterFirst = true ;<br>			
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; Render( ) ;<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; m_Refresh = true ;<br>
+&nbsp;&nbsp;&nbsp;&nbsp; }<br>
+&nbsp;&nbsp;&nbsp;&nbsp; // is it time to jump the vcounter backwards?<br>
+&nbsp;&nbsp;&nbsp;&nbsp; else if ((vcount == GetVJump()) &amp;&amp; m_VCounterFirst) <br>
+&nbsp;&nbsp;&nbsp;&nbsp; {<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; m_VCounterFirst = false ;<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; m_VCounter = GetVJumpTo() ;<br>
+&nbsp;&nbsp;&nbsp;&nbsp; }<br><br>
+
+&nbsp;&nbsp;&nbsp;&nbsp; // are we just about to enter vertical refresh?<br>
+&nbsp;&nbsp;&nbsp;&nbsp; else if (m_VCounter == m_Height)<br>
+&nbsp;&nbsp;&nbsp;&nbsp; {<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; m_IsVBlank = true ;<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; m_Status = BitSet(m_Status, 7) ; // irq pending<br>
+&nbsp;&nbsp;&nbsp;&nbsp; }<br><br>
+
+&nbsp;&nbsp;&nbsp;&nbsp; if (m_VCounter &gt;= m_Height)<br>
+&nbsp;&nbsp;&nbsp;&nbsp; {<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; // do not reload the line interupt until we are past the <br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; // FIRST line of the none active display period<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; if (m_VCounter != m_Height)<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; m_LineInterupt = m_VDPRegisters[0xA] ;<br><br>
+
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; // we can now update the vertical scroll value<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; m_VScroll = m_VDPRegisters[0x9] ;<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; BYTE mode = GetVDPMode( ) ;<br><br>
+
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; // are we chaning the screen resolution?<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; if (mode == 11)<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; m_Height = NUM_RES_VERT_MED ;<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; else if (mode == 14)<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; m_Height = NUM_RES_VERT_HIGH ;<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; else<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; m_Height = NUM_RES_VERTICAL ;<br>
+&nbsp;&nbsp;&nbsp;&nbsp; }<br><br>
+
+&nbsp;&nbsp;&nbsp;&nbsp; // if we are in active display then draw next scanline<br>
+&nbsp;&nbsp;&nbsp;&nbsp; if (m_VCounter &lt; m_Height)<br>
+&nbsp;&nbsp;&nbsp;&nbsp; {<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; m_ScreenDisabled = !IsRegBitSet(1,6) ;	<br>		
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; Render( ) ;<br>
+&nbsp;&nbsp;&nbsp;&nbsp; }<br><br>
+
+&nbsp;&nbsp;&nbsp;&nbsp; // decrement the line interupt counter during the active period<br>
+&nbsp;&nbsp;&nbsp;&nbsp; // including the first line of the none active display period<br>
+&nbsp;&nbsp;&nbsp;&nbsp; if (m_VCounter &lt;= m_Height)<br>
+&nbsp;&nbsp;&nbsp;&nbsp; {<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; bool underflow = false ;<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; if (m_LineInterupt == 0)<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; {<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; underflow = true ;<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; }<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; m_LineInterupt-- ;<br><br>
+
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; // it is going to underflow<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; if (underflow)<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; {<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; m_LineInterupt = m_VDPRegisters[0xA] ;<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; if (IsRegBitSet(0,4))<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; m_RequestInterupt = true ;<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; }<br>
+&nbsp;&nbsp;&nbsp;&nbsp; }<br>
+&nbsp;&nbsp; }<br>
+&nbsp;&nbsp; // do we want to signal an interrupt<br>
+&nbsp;&nbsp; if (TestBit(m_Status,7) &amp;&amp; IsRegBitSet(1,5))<br>
+&nbsp;&nbsp;&nbsp;&nbsp; m_RequestInterupt = true ;<br>
+}
+</p>
+
+At first that looks pretty scary but like everything when you break it 
+down in to smaller chunks it becomes much more manageable. All the code 
+above before the line "if (nextline)" is controlling the timing of the 
+vdp. It moves the hcounter on at twice the speed of the vdp clock and 
+moves onto the nextline when
+it goes passed the value 684. When it does go past this value it moves 
+onto the next scanline. The variable m_RunningCycles is a float used so 
+we dont lose accuracy when converting down from machine cycles to vdp 
+clock cycles. Although we do ignore the deciamal points when determining
+ how many cycles to add to the hcounter we do still keep them for the 
+next update so we dont lose accuracy.<br><br>
+
+When moving onto the next scanline the first thing we need to do is 
+increment the vcounter to show which scanline we're drawing. If the 
+previous vcounter was 255(0xFF) then we have come to the end of the 
+inactive display period and are ready to draw the first line of the 
+active display period. <br><br>
+
+As discussed in the "Regions" section on this page in order to fit the 
+262 scanlines into a one byte variable the vcounter needs to jump 
+backwards when it hits a specific scanline, this is what the next 
+section section is doing. For example the standard NTSC small resolution
+ will jump backwards after drawing scanline 0xDA back to 0xD5 and then 
+it continues to 255. This is also what the m_VCounterFirst flag is doing
+ so it isnt constantly jumping back to 0xD5 everytime it reaches 0xDA as
+ we only want to do that once a frame.<br><br>
+
+Whenever we start the first line of the inactive display period (meaning
+ we have drawn all the active scanlines which is the value of m_Height) 
+we must set bit7 of the status register to signal we have an interrupt 
+request pending. <br><br>
+
+When we are in the inactive display period (m_VCounter &gt;= m_Height) 
+we are then allowed to reset the vertical scroll value to the contents 
+of register 9 (discussed later) aswell as changing the screen resolution
+ to large, medium or small. I'll discuss in the next section how to 
+determine what vdp mode we are in.<br><br>
+
+Obviously if we are still in the active display period (m_VCounter &lt; 
+m_Height) then we want to draw the next scanline but only if the screen 
+is enabled.<br><br>
+
+Finally we want to decrement the line counter each time we move onto a 
+new line in the active display period (including the first line of the 
+inactive display period) and if it underflows we request an interrupt if
+ line interrupts are enabled.<br><br>
+
+We are then left with checking if we need to request a vdp interrupt.
+<p></p>
+
+<h3><b>Display Modes</b></h3>
+<p>
+
+As previously mentioned there are 2 vdp modes the master system uses 
+(all games use mode 4 apart from F-16 Fighter which uses mode 2). 
+However the vdp mode represents more than whether it is in mode 4 or 
+mode 2. It also represents what the screen resolution is. The vdp mode 
+is comprised of the following 4 bits.
+
+</p><p class="block">
+Bit 3: Mode 4 (The same as control register 0 bit 2)<br>
+Bit 2: Mode 3 (The same as control register 1 bit 3)<br>
+Bit 1: Mode 2 (The same as control register 0 bit 1)<br>
+Bit 0: Mode 1 (The same as control register 1 bit 4)<br><br>
+
+</p>
+
+The following combinations of these bits you need to be aware of:
+
+<p class="block">
+0010 = Mode 2<br>
+1000 = Mode 4<br>
+1010 = Mode 4 <br>
+1011 = Mode 4 with medium display res<br>
+1100 = Mode 4<br>
+1110 = Mode 4 with large display res<br>
+1111 = Mode 4
+
+</p>
+
+This is how you emulate the GetVDP function I used in the Update function. Hopefully it makes perfect sense
+
+<p class="code">
+
+BYTE TMS9918A::GetVDPMode( ) const<br>
+{<br>
+&nbsp;&nbsp; BYTE res = 0 ;<br>
+&nbsp;&nbsp; res |= BitGetVal(m_VDPRegisters[0x0],2) &lt;&lt; 3;<br>
+&nbsp;&nbsp; res |= BitGetVal(m_VDPRegisters[0x1],3) &lt;&lt; 2;<br>
+&nbsp;&nbsp; res |= BitGetVal(m_VDPRegisters[0x0],1) &lt;&lt; 1;<br>
+&nbsp;&nbsp; res |= BitGetVal(m_VDPRegisters[0x1],4) ;<br>
+&nbsp;&nbsp; return res ;<br>
+}
+
+</p>
+
+<p></p>
+
+<h3><b>Codemasters:</b></h3>
+<p>
+I've mentioned already how the screen resolution can be changed to make 
+the amount of scanlines in the vertical active display period larger. 
+The only games to actually use this feature are Codemasters games. You 
+dont need to worry about detecting if it is a codemasters game or not, 
+you just need to handle the change when the appropriate values are 
+written to the control registers. Remember that the namebase address is 
+interpreted differently when using a higher screen resoultion. This was 
+discussed in the control registers section.
+
+</p>
+
+<h3><b>Rendering:</b></h3>
+<p>
+I will now go on to explain how rendering is done for mode 4 only not 
+mode 2, mainly because everything you need to render mode 2 I'll cover 
+in mode 4. To tackle mode 2 yourself you will need to read Sean Youngs 
+VDP documentation that I link to in the "Resources" section of these 
+tutorials. <br><br>You will notice in the UpdateCycle section I referred to the Render function. This is its implementation:
+
+</p><p class="code">
+void TMS9918A::Render( )<br>
+{<br><br>
+	
+&nbsp;&nbsp; BYTE mode = GetVDPMode();<br><br>
+		
+
+&nbsp;&nbsp; if ( mode == 2 )<br>
+&nbsp;&nbsp; {<br>
+&nbsp;&nbsp;&nbsp;&nbsp; RenderSpritesMode2( ) ;<br>
+&nbsp;&nbsp;&nbsp;&nbsp; RenderBackgroundMode2( ) ;<br>			
+&nbsp;&nbsp; }<br>
+&nbsp;&nbsp; else<br>
+&nbsp;&nbsp; {<br>
+&nbsp;&nbsp;&nbsp;&nbsp; RenderSpritesMode4( ) ;<br>
+&nbsp;&nbsp;&nbsp;&nbsp; RenderBackgroundMode4( ) ;<br>
+&nbsp;&nbsp; }<br>	
+}
+</p>
+
+I'll explain why I render sprites before background in the next section
+
+<p></p>
+
+<h3><b>Sprite Rendering Mode 4:</b></h3>
+<p>
+Before I go into detail about how sprites are rendered there are still a
+ few loose ends I need to tie up. Firstly the VDP cannot draw more than 8
+ sprites on any scanline and if it tries to draw more than 8 sprites 
+then it sets the sprite overflow flag in the status register and stops 
+drawing the remaining sprites on the scanline.<br><br>
+
+There are 64 sprites available to draw which are referenced in the 
+sprite attribute table. The order in which sprites are drawn is the 
+order they appear in the sprite attributes table. Obviously a sprite is 
+only drawn if its current position falls withing range of the current 
+vcounter. However if a sprite with a Y axis position of 0xD0 is 
+encountered when the screen resoultion is set to "small" then this 
+sprite and all remainging sprites are NOT drawn.<br><br>
+
+If two sprites overlap each other then the appropriate flag in the 
+status register is set. Now you may be wondering why im explaining how 
+to emulate sprites before I've discussed how to emulate tiles. There are
+ two reasons for this, the first being it is easier to render sprites 
+because they cannot be scrolled (which is the most difficult part of 
+this VDPs emulation) and the second reason is I find it easier to detect
+ sprite collisions by rendering the sprites first. The way I go about 
+emulating the VDP rendering is at the start of every frame I clear the 
+render buffer so each pixel is set to a known colour. I then draw a line
+ at a time firstly drawing the sprites on that line and then the tiles. 
+When I colour one of the pixels in the render buffer for the current 
+sprite being drawn I test to see if the current colour of the pixel is 
+the same colour what I preset it to when drawing a new frame. If it is 
+the same colour then it is not a sprite collision, however if it is a 
+different colour then it must be a sprite collision. When I come to 
+drawing tiles I only ever draw the pixel if the current pixel colour is 
+the same as what I preset it to otherwise there is a sprite drawn there 
+and sprites have a higher priority by default than tiles. However it is 
+possible for a tile to have a higher priority than a sprite and if this 
+is the case then I overwrite the drawn sprite. <br><br>
+
+Now we have armed ourselves with enough information to start emulating 
+sprites. Firstly we need to know what sprites out of the 64 need drawing
+ on the current scanline (if any). So we first loop through the sprite 
+attribute table a sprite at a time and determine if the sprites position
+ lies within range of the current scanline. We also need to take into 
+account the size of the sprite as this will affect the range of 
+scanlines it will appear on. Now seems a good time to show the code for 
+determing where in memory the sprite attribute table resides and what 
+information can be obtained for each sprite.<br><br>
+
+Control register 0x5 is used to set the base of the sprite attribute 
+table. As previously mentioned this 8 bit register value has bits 7 and 0
+ ignored and it is shifted left 7 places to get the starting address of 
+the sprite attribute table.
+
+</p><p class="code">
+
+WORD TMS9918A::GetSATBase( ) const<br>
+{<br>
+&nbsp;&nbsp; BYTE reg5 = m_VDPRegisters[0x5] ;<br><br>
+
+&nbsp;&nbsp; // bits 7 and 0 are ignored<br>
+&nbsp;&nbsp; reg5 &amp;= 0x7E ;<br><br>
+&nbsp;&nbsp; WORD res = reg ;<br>
+&nbsp;&nbsp; return (res &lt;&lt; 7) ;<br>
+}
+
+</p>
+
+Now we know where to find the SAT how do we interpret its contents? Each
+ sprite takes 4 bytes of memory in the SAT, the first byte being the y 
+position, the second being x position, the third being the pattern index
+ and the final byte is unused. However to make life difficult for us a 
+sprites data are not found next to each other in memory. All the sprites
+ y patterns are found together within the first 64 bytes of SAT memory. 
+The x position of the sprite is located
+128 bytes after the SAT base plus the sprite number multiplied by 2 (int
+ x = m_VDPMemory[GetSATBase() + 128 + (sprite*2)]. The pattern index is 
+found 1 byte after the x position.<br><br>
+
+Now we know the x and y position of the sprite we need to remember that 
+the x position can be shifted left by 8 pixels if control register 0 bit
+ 3 is set. Also the y position actually represents a position of y + 1. 
+So if the y position is 0 then it starts on scanline 1.<br><br>
+
+The pattern index is a lookup for the pattern located in vdp memory 0x0 -
+ 0x37FF. A pattern is the data needed to actually draw the specified 
+sprite/tile. The 448 patterns in the pattern table are split into two 
+tables. The first pattern table stores pattern indexes of 0-255 and the 
+second pattern table store the indexes 256-447. The pattern index value 
+retrieved from the SAT will either refer to the first or the second 
+table. If it refers to the second table then the pattern index value is 
+increased by 256, so a pattern index value of 7 will become 263 if using
+ the second table. To determine which pattern table to use it is the 
+value of bit 2 of control register 6. If the value is 1 then it uses the
+ second pattern table, otherwise it is the first. You also need to reset
+ bit 0 of the pattern index if the second pattern table is used and the 
+sprite is 8x16 in size.<br><br>
+
+Each pattern takes 32 bytes of memory and there are a total of 448 
+patterns. So to find the pattern address in memory it is as simple as 
+multiplying the pattern index by 32. These 32 bytes represent each pixel
+ colour of the 8x8 pattern. Each 4 bytes of the total 32 bytes gives a 
+description of the colour for a single line of the pattern. As there are
+ 8 lines and 4 bytes for each this gives us the magic number of 32. So 
+the first 4 bytes give the first line data, the second 4 bytes gives the
+ second line data etc. So how do these 4 bytes give the colour of a 
+pattern line? First you must understand that the 32 bytes of data do not
+ encode the pixel colour but a palette. The value retrieved from the 32 
+bytes of data is used as a lookup in the palette to find the exact 
+colour. The reason for this is the programmer can change the palette 
+colours without changing the pattern data which would change the pattern
+ to have a completely different colour. A pattern line has 8 pixels and 
+is drawn from left to right. A byte has 8 bits so each bit can be used 
+to represent one of the 8 pixels. So bit 7 represents the left most 
+pixel, bit 6 represents the left most pixel +1.... bit 0 represents the 
+right most pixel. So to get the palette lookup index of the left most 
+pixel you combine all the bit 7 values of the 4 bytes.
+
+<p class="code">
+
+BYTE palette = 0 ;<br>
+BYTE bit = BitGetVal(data4,col) ;<br>
+palette = (bit &lt;&lt; 3) ;<br>
+bit = BitGetVal(data3,col) ;<br>
+palette |= (bit &lt;&lt; 2) ;<br>
+bit = BitGetVal(data2,col) ;<br>
+palette |= (bit &lt;&lt; 1) ;<br>
+bit = BitGetVal(data1, col) ;<br>
+palette |= bit ;
+</p>
+
+BitGetVal returns a value of 0 or 1 depending if the corresponding bit 
+is set. This palette value is then used to lookup the correct colour for
+ the pixel. (I believe palette 0 signifies that the sprite is 
+transparent and shouldnt be drawn. However I cannot find the document 
+which explained this so you may want to experiment with it.) To lookup 
+the correct colour it is as simple as plugging the palette value into 
+CRAM, however sprites use the second palette in CRAM, each palette is 16
+ bytes in size so we get the following:
+
+<p class="code">
+
+BYTE colour = m_CRAM[palette+16] ;
+</p>
+
+What does this colour byte represnt though? Bits 1-0 of this colour byte
+ represent the red shade. Bits 3-2 represent the green shade. Bits 5-4 
+represent the blue shade. Now I never managed to find exactly how this 
+mapped on to specific colours so I had a guess and it seems to work 
+perfectly (if you dont believe me check out my screenshots). The way I 
+figured it was if each of the red, green and blue shades are represented
+ by 2 bits then this gives 4 different possible shades of the colour 
+(values 0-3). Each shade will be between 0 and 255. So a value of 0 
+would give a shade of 0, a value of 3 would give a shade of 255 and the 
+other 2 shades would give values somewhere in between. The logical 
+values are 85 for a value of 1 and 170 for a value of 2. If you are 
+wondering why these are logical it is because values 85 and 170 evenly 
+space out the two midpoints of the range 0-255.
+
+<p class="code">
+
+BYTE TMS9918A::GetColourShade(BYTE val) const<br>
+{<br>
+&nbsp;&nbsp; switch (val)<br>
+&nbsp;&nbsp; {<br>
+&nbsp;&nbsp;&nbsp;&nbsp; case 0: return 0 ; break ;<br>
+&nbsp;&nbsp;&nbsp;&nbsp; case 3: return 255 ; break ;<br>
+&nbsp;&nbsp;&nbsp;&nbsp; case 1: return 85 ; break ;<br>
+&nbsp;&nbsp;&nbsp;&nbsp; case 2: return 170 ; break ;<br>
+&nbsp;&nbsp;&nbsp;&nbsp; default : assert(false); return 0 ; break ;<br>
+&nbsp;&nbsp; }<br>
+}
+
+</p>
+
+Hopefully I have explained everything needed to emulate the rendering of
+ mode 4 sprites. Because my emulation code is to large to fit on this 
+page I shall point you to a text file which shows you the code. click <a href="http://www.codeslinger.co.uk/pages/projects/mastersystem/snippet_vdp_sprites.txt">here</a> to view it. <br><br>
+
+You will notice that I use the function WriteToScreen in sprite rendering and tile rendering. This is its implementation:
+
+<p class="code">
+
+void TMS9918A::WriteToScreen(BYTE x, BYTE y,BYTE red, BYTE green, BYTE blue)<br>
+{<br>	
+&nbsp;&nbsp; if (m_Height == NUM_RES_VERTICAL)<br>
+&nbsp;&nbsp; {<br>
+&nbsp;&nbsp;&nbsp;&nbsp; m_ScreenStandard[y][x][0] = red ;<br>
+&nbsp;&nbsp;&nbsp;&nbsp; m_ScreenStandard[y][x][1] = green ;<br>
+&nbsp;&nbsp;&nbsp;&nbsp; m_ScreenStandard[y][x][2] = blue ;<br>
+&nbsp;&nbsp; }<br>
+&nbsp;&nbsp; else if (m_Height == NUM_RES_VERT_MED)<br>
+&nbsp;&nbsp; {<br>
+&nbsp;&nbsp;&nbsp;&nbsp; m_ScreenMed[y][x][0] = red ;<br>
+&nbsp;&nbsp;&nbsp;&nbsp; m_ScreenMed[y][x][1] = green ;<br>
+&nbsp;&nbsp;&nbsp;&nbsp; m_ScreenMed[y][x][2] = blue ;<br>
+&nbsp;&nbsp; }<br>
+&nbsp;&nbsp; else if (m_Height == NUM_RES_VERT_HIGH)<br>
+&nbsp;&nbsp; {<br>
+&nbsp;&nbsp;&nbsp;&nbsp; m_ScreenHigh[y][x][0] = red ;<br>
+&nbsp;&nbsp;&nbsp;&nbsp; m_ScreenHigh[y][x][1] = green ;<br>
+&nbsp;&nbsp;&nbsp;&nbsp; m_ScreenHigh[y][x][2] = blue ;<br>
+&nbsp;&nbsp; }<br>
+}
+
+</p>
+
+As you can see I have 3 different screen buffers for the 3 different 
+resolutions. The last thing needed to mention is in order to detect 
+sprite collision I get the current colour of the pixel I'm about to 
+colour and if it is not set to SCREENBLANKCOLOUR then I set the sprite 
+collision flag. The function GetScreenPixelColour simply returns a 
+colour for the x and y position of the current screen buffer being used.
+ At the start of each frame I set all pixels to SCREENBLANKCOLOUR which 
+is 0x01
+
+<p></p>
+
+<h3><b>Background Rendering Mode 4:</b></h3>
+<p>
+The rendering of the background tiles is very similar to the sprites. It
+ still gets a pattern number and draws them in the same way as the 
+sprites did however it has the extra complication of priorities, 
+scrolling and masking. This is what I shall go into detail with and not 
+the rest of the emulation which was covered in the sprite section. <br><br>
+
+Firstly lets determine how the tiles are stored in vdp memory. Tile 
+information is stored in the name table of vdp memory. The size of the 
+name table is 2 bytes for each tile ("small" resolution has 32x28 tiles,
+ the others have 32x32). The following is how to interpret the 2 bytes 
+for each tile:
+
+</p><p class="block">
+
+Bit 15 - 13: Unused <br>
+Bit 12: Priority flag<br>
+Bit 11: Which palette to use<br>
+Bit 10: Vertical Flip Flag<br>
+Bit 09: Horizontal Flip Flag<br>
+Bit 08 - 00 : Pattern Index
+</p>
+
+The name table does not have a fixed memory address. It is usually 
+located at 0x3800 - 0x3EFF but it can be changed. When I went into 
+detail earlier in this tutorial on register 2 I gave the algorithm for 
+converting register 2 into the name table. This is its implementation:
+
+<p class="code">
+
+WORD TMS9918A::GetNameBase( ) const<br>
+{<br>
+&nbsp;&nbsp; BYTE reg2 = m_VDPRegisters[0x2] ;<br><br>
+
+&nbsp;&nbsp; if (m_Height == 192) // using small res<br>
+&nbsp;&nbsp; {<br>
+
+&nbsp;&nbsp;&nbsp;&nbsp; // bit 0 is ignored so is top nibble<br>
+&nbsp;&nbsp;&nbsp;&nbsp; reg2 &amp;= 0xF ;<br>
+&nbsp;&nbsp;&nbsp;&nbsp; reg2 = BitReset(reg2,0) ;<br>
+&nbsp;&nbsp;&nbsp;&nbsp; return ((WORD)reg2) &lt;&lt; 10 ;<br>
+&nbsp;&nbsp; }<br><br>
+
+&nbsp;&nbsp; // must be medium or large res<br><br>
+ 	
+&nbsp;&nbsp; reg2 &amp;= 0xC;<br>
+&nbsp;&nbsp; WORD res = reg2 ;<br>
+&nbsp;&nbsp; res &lt;&lt;= 10 ;<br>
+&nbsp;&nbsp; res |= 0x700 ;<br>
+&nbsp;&nbsp; return res ;<br>
+}
+
+</p>
+
+Now we have our name base table address we just loop through that for 
+each tile we're drawing and then draw the approprite tile. The 
+difference between drawing a tile and a sprite is that there is no 
+logical sequence for drawing a sprite. Meaning that sprite #1 could be 
+on the bottom right position where sprite #2 could be in the center 
+point of the screen. This is why we have to check each sprite to see if 
+it falls into range of our current vcounter before drawing it. However 
+with drawing tiles then tile#0 will be drawn at the top left position 
+and then tile#1 will be drawn to the right of it etc for the entrire 
+32x28 or (32x32 when using medium or large res), please note this is 
+only true when scrolling is not active as we will see later. Apart from 
+this they will get drawn in roughly the same manner.<br><br>
+
+Typically a tile will always be drawn behind the sprite however if the 
+priority bit for the tile data is set (bit 12) then it will appear in 
+front of the sprite. The only exception to this rule is if the palette 
+for the tile is 0 which means the tile is transparent and shouldnt be 
+drawn. <br><br>
+
+We also need to be aware of the masking of the first column. This means 
+that if the masking flag is set (bit 5 of register 0) then the first 8 
+pixels of each scanline will be set to the colour of the backdrop colour
+ specified in register 07. The first column mask has the highest 
+priority and will always appear in front of tiles and sprites if bit 5 
+of register 0 is set. <br><br>
+
+In my opinion the most compilcated part of the VDP emulation is the 
+scrolling of the background. Your best bet at understanding this is to 
+read Charles MacDonald's VDP document that I list in the resource 
+section of the SMS tutorials. Charles refers to the horizontal scrolling
+ as seperated into two sections the starting column and the fine scroll 
+value. I interpret this as the starting column is which column to start 
+drawing from in the name table. So it is possible that this is set to 
+the arbitary number 4 (of 32) which means that the 4th tile will be 
+drawn against the left edge of the screen. After drawing each column the
+ starting column is incrememented until it gets to 32 and then it starts
+ from 0 again. The fine scroll value is simply which pixel inside the 
+starting column we start drawing from. For eaxample if the starting 
+column is 4 and the fine scroll is 3 then the 3rd pixel of the 4th 
+column will be drawn at the left hand edge of the screen. The starting 
+column is taken from the upper 5 bits of register 0x8 and the fine 
+scroll value is taken from the lower 3 bits. The only other part to 
+horizontal scrolling is if bit 6 of register 0 is set then the first row
+ of the screen remains fix and does not scroll horizontally. <br><br>
+
+Vertical scrolling works similar to horizontal scrolling with the 
+exception that it has a starting row instead of a starting column. This 
+works in the same way as the starting column except it specifies which 
+row is drawn at the top of the screen. So if the starting row is set to 5
+ then the fifth row is drawn at the top of the screen, and after drawing
+ the fifth row then it will increment to row 6 etc until it reaches 
+either 28 for small resolution or 32 for medium and large which it will 
+then start from 0 again. The fine scroll value works in the same way as 
+horizontal scrolling in the way that it specifies which pixel of the 
+starting row is drawn first. If bit 7 of register 0 is set then the 
+columns 24-32 are fixed and does not scroll vertically. Although the 
+starting row is taken from the top 5 bits of register 9 and the fine 
+scroll is the bottom 3. Any changes to this register does not get 
+updated until after the active display period.<br><br>
+
+We are almost done with the information gathering for tile emulation, 
+the only parts left to mention is that a tile can be flipped vertically 
+or horizontally (or both) based on its tile data and it can use either 
+the background tile palettes or the sprite palettes which can also be 
+obtained from the tile data. The following is pseudo code for gathering a
+ tiles data:
+
+<p class="code">
+
+WORD nameBaseOffset = GetNameBase() ;<br>
+nameBaseOffset += currentRow * 64 ; //each scanline has 32 tiles which is 2 bytes in memory<br>
+nameBaseOffset += currentCol * 2 ; // each tile is two bytes in memory<br><br>
+
+WORD tileData = m_VRAM[nameBaseOffset+1] &lt;&lt; 8 ;<br>
+tileData |= m_VRAM[nameBaseOffset] ;<br>
+
+bool hiPriority = TestBit(tileData,12) ;<br>
+bool useSpritePalette = TestBit(tileData,11) ;<br>
+bool vertFlip = TestBit(tileData,10) ;<br>
+bool horzFlip = TestBit(tileData,9) ;<br>
+WORD tileDefinition = tileData &amp; 0x1FF ;
+
+</p>
+
+I explained a few paragraphs above exactly how the tile data is 
+obtained. Everything else should now be the same for drawing a tile 
+compared to drawing a sprite. It is the tile definition which will give 
+us the pattern data needed for drawing the tile (remember it is 4 bytes 
+per line and there are 8 lines so there are 32 bytes needed for drawing a
+ pattern. If you are unsure re-read the paragraph in sprite rendering 
+which starts with "Each pattern takes 32 bytes of memory".). We are now 
+ready to examine the full code for tile emulation which can be found <a href="http://www.codeslinger.co.uk/pages/projects/mastersystem/snippet_vdp_tiles.txt">here</a>
+
+</div>
+
+<div id="sidebar">
+
+<h3>Master System Emulation:</h3>
+
+<p>
+<a class="sidelink" href="http://www.codeslinger.co.uk/pages/projects/mastersystem/resources.html">Resources</a><span class="hide"> | </span>
+<a class="sidelink" href="http://www.codeslinger.co.uk/pages/projects/mastersystem/hardware.html">The Hardware</a><span class="hide"> | </span>
+
+<a class="sidelink" href="http://www.codeslinger.co.uk/pages/projects/mastersystem/starting.html">Getting Started</a><span class="hide"> | </span>
+<a class="sidelink" href="http://www.codeslinger.co.uk/pages/projects/mastersystem/memory.html">Memory</a><span class="hide"> | </span>
+
+<a class="sidelink" href="http://www.codeslinger.co.uk/pages/projects/mastersystem/z80.html">Z80</a><span class="hide"> | </span>
+<a class="sidelink" href="http://www.codeslinger.co.uk/pages/projects/mastersystem/vdp.html">VDP</a><span class="hide"> | </span>
+
+<a class="sidelink" href="http://www.codeslinger.co.uk/pages/projects/mastersystem/joypads.html">Joypads</a><span class="hide"> | </span>
+<a class="sidelink" href="http://www.codeslinger.co.uk/pages/projects/mastersystem/interrupts.html">Interrupts</a><span class="hide"> | </span>
+<a class="sidelink" href="http://www.codeslinger.co.uk/pages/projects/mastersystem/sound.html">Sound</a><span class="hide"> | </span>
+<a class="sidelink" href="http://www.codeslinger.co.uk/pages/projects/mastersystem/finished.html">Finished Project</a><span class="hide"> | </span>
+
+</p>
+
+</div>
+    
+<div id="footer">
+Copyright © 2008 codeslinger.co.uk
+</div>
+
+</div>
+
+
+
+
+
+
+</body></html>

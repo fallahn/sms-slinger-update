@@ -1,0 +1,300 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml" xml:lang="en" lang="en"><head>
+<meta http-equiv="content-type" content="text/html; charset=UTF-8">
+<meta name="description" content="_Emulation Programming_">
+<meta name="keywords" content="_Emulation,Chip8,Gameboy,NES,SNES,Genesis,Master,System,Mega,Drive_">
+<meta name="author" content="CodeSlinger /">
+<link rel="stylesheet" type="text/css" href="starting_files/css.css" media="screen,projection" title="CodeSlinger (screen)">
+<link rel="stylesheet" type="text/css" href="starting_files/print.css" media="print">
+<title>codeslinger.co.uk</title>
+</head>
+
+<body>
+<div>
+<br><br>
+</div>
+
+<div id="container">
+<div id="logo">
+<h1><a href="http://www.codeslinger.co.uk/index.html">codeslinger.co.uk</a></h1>
+</div>
+
+<div id="navitabs">
+<h2 class="hide">Site menu:</h2>
+<a class="navitab" href="http://www.codeslinger.co.uk/index.html">Home</a><span class="hide"> | </span>
+<a class="navitab" href="http://www.codeslinger.co.uk/pages/basics.html">Basics</a><span class="hide"> | </span>
+
+<a class="navitab" href="http://www.codeslinger.co.uk/pages/projects/N64.html">N64</a><span class="hide"> | </span>
+<a class="navitab" href="http://www.codeslinger.co.uk/pages/projects/megadrive.html">Mega Drive/Genesis</a><span class="hide"> | </span>
+<a class="activenavitab" href="http://www.codeslinger.co.uk/pages/projects/mastersystem.html">Master System</a><span class="hide"> | </span>
+<a class="navitab" href="http://www.codeslinger.co.uk/pages/projects/gameboy.html">Gameboy</a><span class="hide"> | </span>
+<a class="navitab" href="http://www.codeslinger.co.uk/pages/projects/chip8.html">Chip8</a><span class="hide"> | </span>
+
+<a class="navitab" href="http://www.codeslinger.co.uk/pages/blog/index.html">Blog</a><span class="hide"> | </span>
+</div>
+	
+<div id="desc">
+<h2>codeslinger.co.uk</h2>
+<p> Sega Master System - Getting Started.</p>
+
+</div>
+
+<div id="main">
+
+<h3><b>Getting Started:</b></h3>
+<p>
+Throughout the rest of these tutorials you will notice that the SMS 
+deals in bytes and words. Unfortunately there are no standard keywords 
+in C++ for
+these basic types, however there are other primitive types that are a 
+byte and a word in size. A "char" is a byte and a "short" is a word. 
+However my personal
+opinion is that having the type "char" when dealing with registers just 
+seems wrong so you will notice I've typedef'd them as BYTE and WORD. On 
+the rare occasion
+that I needed a signed byte and a signed word I typedef'd them as 
+SIGNED_BYTE and SIGNED_WORD respectively <br><br>
+
+</p><p class="block"> 
+typedef unsigned char BYTE;<br>
+typedef unsigned short int WORD;<br>
+typedef signed short int SIGNED_WORD;<br>
+typedef signed char SIGNED_BYTE;
+</p>
+
+
+
+<p></p>
+
+
+<h3><b>ROM Files:</b></h3>
+<p>
+
+The largest known SMS game is 1 mega byte (equivelant to 0x100000 
+bytes). This is easily small enough for us to load the entire rom in at 
+the start of our emulation. In the next section of the tutorials I will 
+explain indepth the
+internal memory structure of the SMS. However for now I need to briefly 
+touch on the read only memory inside the SMS.<br><br>
+
+The SMS memory has at the beginning space for 0xC000 bytes of ROM 
+memory. This is obviously too small to fit the larger ROMS into, 
+remember the maximum ROM size is 0x100000 which is considerably bigger 
+than 0xC000. Like most
+gaming systems the SMS pages in and out memory that it needs when it 
+needs it. Each page is 0x4000 bytes and as there is space for 0xC000 
+bytes of game memory there is enough room for 3 pages (0xc000/0x4000 = 
+3). When the SMS is loaded
+the first 3 pages of the ROM file is loaded into the internal SMS 
+memory. We will deal with the memory paging in the next section of the 
+tutorials. However for now it is worth knowing that the smallest ROM 
+file is 32k which is only 2 pages (0x8000 bytes)
+so this will fit into the first 0xC000 with room to spare. This means 
+that ROMS that are 32k in size do not need to do memory paging. I 
+recommend you start your SMS emulation journey like I did with 32k ROMs.<br><br>
+
+When using a Sega Genesis/Mega Drive ROM dumping program some of them 
+put a 512 header onto the beginning of the ROM. This needs to be 
+stripped off otherwise the ROM wont work because all the memory will be 
+in the wrong location. The way to detect if the ROM
+has the header attached to it is to modulus the size of the ROM with 
+0x4000 and if the answer is 512 then we need to remove the first 512 
+bytes from the ROM.<br><br>
+
+Below is the declarations of the variables used with ROM loading:
+
+</p><p class="code">
+
+BYTE m_InternalMemory[0x10000] ;<br>
+BYTE m_GameMemory[0x100000] ; <br>
+bool m_IsCodeMasters ; <br>
+bool m_OneMegCartridge ;
+</p> 
+
+Putting all of this information together we can load in a ROM file like so:<br><br>
+
+<p class="code">
+void Emulator::InsertRom(const char* filename)<br>
+{<br>
+&nbsp; memset(m_InternalMemory,0,sizeof(m_InternalMemory)) ;<br>
+&nbsp; memset(m_GameMemory,0,sizeof(m_GameMemory)) ; <br><br>
+
+&nbsp; FILE *in = NULL;<br><br>
+
+&nbsp; // get the file size<br>
+&nbsp; in = fopen( filename, "rb" );<br>
+&nbsp; fseek( in, 0L, SEEK_END );<br>
+&nbsp; long endPos = ftell( in );<br>
+&nbsp; fclose(in);<br><br>
+
+&nbsp; in = fopen( filename, "rb" );<br><br>
+
+&nbsp; endPos = endPos % 0x4000 ;<br><br>
+
+&nbsp; if (endPos == 512)<br>
+&nbsp; {<br>
+&nbsp;&nbsp; // we need to strip off the header<br>
+&nbsp;&nbsp; char header[1000] ;<br>
+&nbsp;&nbsp; if (endPos == 512) <br>
+&nbsp;&nbsp; {<br>
+&nbsp;&nbsp; &nbsp; fread(header,1,512,in) ;<br>
+&nbsp;&nbsp; }<br>
+&nbsp; }<br><br>
+
+&nbsp; size_t size = fread(m_CartridgeMemory, 1, 0x100000, in);<br>
+&nbsp; m_OneMegCartridge = (endPos &gt; 0x80000)?true:false ;<br><br>
+	
+&nbsp; // copy the first 3 pages from cartridge memory to internal memory<br>
+&nbsp; memcpy(&amp;m_InternalMemory[0x0], &amp;m_CartridgeMemory[0x0], 0xC000) ;<br><br>
+
+&nbsp; m_IsCodeMasters = IsCodeMasters() ;<br>
+}
+
+</p>
+
+You will notice that we store in the variable m_OneMegCartridge if the 
+ROM is 1mb in size. We need to know this for memory paging as you will 
+see
+in the next section. We also need to know if the ROM is a codemasters 
+game, as discussed below.
+
+<p></p>
+
+<h3><b>CodeMasters ROM Files:</b></h3>
+<p>
+CodeMasters games use their own memory mapper so we need to know if a 
+ROM is a CodeMasters game or not. Now this is again something I wish to 
+talk about in the next section of tutorials but
+in order to determine if a ROM is a CodeMasters ROM we need to check 
+when we are loading in the ROM. There maybe many ways to detect if a ROM
+ is a CodeMasters ROM or not but the way I've done it is by inspecting 
+the header of the ROM.<br>
+A CodeMasters ROM header has a checksum part of it so if we compute the 
+checksum and it all works ok then we have a CodeMasters game. The way 
+the checksum works is by combining memory address 0x7fe7 and 0x7fe6 to 
+form a 16 bit number. If this
+16 bit number when taken away from 0x10000 is equal to the 16 bit number
+ formed from memory address 0x7fe9 and 0x7fe8 then we have a codemasters
+ game.
+
+</p><p class="code">
+
+bool Emulator::IsCodeMasters( ) const <br>
+{ <br>
+&nbsp; WORD checksum = m_InternalMemory[0x7fe7] &lt;&lt; 8 ;<br>
+&nbsp; checksum |= m_InternalMemory[0x7fe6] ;<br><br>
+
+&nbsp; if (checksum == 0x0)<br>
+&nbsp;&nbsp; return false ;<br><br>
+
+&nbsp; WORD compute = 0x10000 - checksum ; <br><br>
+
+&nbsp; WORD answer = m_InternalMemory[0x7fe9] &lt;&lt; 8 ;<br>
+&nbsp; answer |= m_InternalMemory[0x7fe8] ;<br><br>
+
+&nbsp; return compute == answer ;
+}
+
+</p>
+
+
+<p></p>
+
+<h3><b>Main emulation loop:</b></h3>
+<p>
+
+Now we have our ROM image loaded into memory we can start the emulation 
+process. I have already shown you the code for the emulation loop in the
+ "The Hardware" section of the SMS tutorials. I shall show it again here
+but this time I shall add where we check for interupts.
+
+</p><p class="code">
+// this is responsible for emulating one frame<br>
+void Emulator::Update( )<br>
+{ <br>
+&nbsp; const double MACHINE_CLICKS_PER_FRAME = 10738580 / 60 ; <br>
+
+&nbsp; unsigned int clicksThisUpdate = 0 ;<br><br>
+
+&nbsp; // emulate 1/60th of a seconds amount of machine clicks<br>
+&nbsp; while (clicksThisUpdate &lt; MACHINE_CLICKS_PER_FRAME) <br>
+&nbsp; {<br>
+&nbsp;&nbsp; int z80ClockCycles = m_Z80.ExecuteNextInst(); <br><br>
+
+&nbsp;&nbsp; HandleInterrupts( ) ;<br><br>
+
+&nbsp;&nbsp; // the machine clock is 3 times faster than the z80 clock<br>
+&nbsp;&nbsp; int machineClicks = z80ClockCycles * 3 ;<br><br>
+
+&nbsp;&nbsp; // the vdp clock is half the speed of the machine clock<br>
+&nbsp;&nbsp; float vdpCycles = machineClicks / 2 ;<br><br>
+
+&nbsp;&nbsp; // the sound clock is the same speed as the z80<br>
+
+&nbsp;&nbsp; int soundCycles = z80ClockCycles ;<br><br>
+
+&nbsp;&nbsp; m_VDP.Update(vdpCycles) ;<br>
+&nbsp;&nbsp; m_Sound.Update(soundCycles) ;<br><br>
+
+&nbsp;&nbsp; clicksThisUpdate += machineClicks ;<br>
+&nbsp; }<br>
+
+}
+
+</p>
+
+I shall implement the new function called HandleInterrupts in the 
+"Interrupts" section to the SMS tutorials. It is important to handle 
+interrupts after the z80 instruction execution
+but before the VDP update otherwise some games wont work. After days of 
+debugging I found this was the problem with the game "XENON 2". The 
+fault lies with the game expecting an interrupt
+at a specific point and if things happen out of sequence then anything 
+could go wrong.<br><br>
+
+Now the main emulation loop is in place all thats left to do is 
+implement those functions it calls which will be a lot of work. Before 
+we start implementing those functions we will next look
+at memory management.<br><br>
+
+<p></p>
+
+
+</div>
+
+<div id="sidebar">
+
+<h3>Master System Emulation:</h3>
+
+<p>
+<a class="sidelink" href="http://www.codeslinger.co.uk/pages/projects/mastersystem/resources.html">Resources</a><span class="hide"> | </span>
+<a class="sidelink" href="http://www.codeslinger.co.uk/pages/projects/mastersystem/hardware.html">The Hardware</a><span class="hide"> | </span>
+<a class="sidelink" href="http://www.codeslinger.co.uk/pages/projects/mastersystem/starting.html">Getting Started</a><span class="hide"> | </span>
+
+<a class="sidelink" href="http://www.codeslinger.co.uk/pages/projects/mastersystem/memory.html">Memory</a><span class="hide"> | </span>
+
+<a class="sidelink" href="http://www.codeslinger.co.uk/pages/projects/mastersystem/z80.html">Z80</a><span class="hide"> | </span>
+<a class="sidelink" href="http://www.codeslinger.co.uk/pages/projects/mastersystem/vdp.html">VDP</a><span class="hide"> | </span>
+<a class="sidelink" href="http://www.codeslinger.co.uk/pages/projects/mastersystem/joypads.html">Joypads</a><span class="hide"> | </span>
+
+<a class="sidelink" href="http://www.codeslinger.co.uk/pages/projects/mastersystem/interrupts.html">Interrupts</a><span class="hide"> | </span>
+<a class="sidelink" href="http://www.codeslinger.co.uk/pages/projects/mastersystem/sound.html">Sound</a><span class="hide"> | </span>
+<a class="sidelink" href="http://www.codeslinger.co.uk/pages/projects/mastersystem/finished.html">Finished Project</a><span class="hide"> | </span>
+
+</p>
+
+</div>
+    
+
+<div id="footer">
+Copyright © 2008 codeslinger.co.uk
+</div>
+
+</div>
+
+
+
+
+
+
+</body></html>

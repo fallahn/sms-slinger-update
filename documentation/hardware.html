@@ -1,0 +1,229 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml" xml:lang="en" lang="en"><head>
+<meta http-equiv="content-type" content="text/html; charset=UTF-8">
+<meta name="description" content="_Emulation Programming_">
+<meta name="keywords" content="_Emulation,Chip8,Gameboy,NES,SNES,Genesis,Master,System,Mega,Drive_">
+<meta name="author" content="CodeSlinger /">
+<link rel="stylesheet" type="text/css" href="hardware_files/css.css" media="screen,projection" title="CodeSlinger (screen)">
+<link rel="stylesheet" type="text/css" href="hardware_files/print.css" media="print">
+<title>codeslinger.co.uk</title>
+</head>
+
+<body>
+<div>
+<br><br>
+</div>
+
+<div id="container">
+<div id="logo">
+<h1><a href="http://www.codeslinger.co.uk/index.html">codeslinger.co.uk</a></h1>
+</div>
+
+<div id="navitabs">
+<h2 class="hide">Site menu:</h2>
+<a class="navitab" href="http://www.codeslinger.co.uk/index.html">Home</a><span class="hide"> | </span>
+<a class="navitab" href="http://www.codeslinger.co.uk/pages/basics.html">Basics</a><span class="hide"> | </span>
+<a class="navitab" href="http://www.codeslinger.co.uk/pages/projects/N64.html">N64</a><span class="hide"> | </span>
+<a class="navitab" href="http://www.codeslinger.co.uk/pages/projects/megadrive.html">Mega Drive/Genesis</a><span class="hide"> | </span>
+<a class="activenavitab" href="http://www.codeslinger.co.uk/pages/projects/mastersystem.html">Master System</a><span class="hide"> | </span>
+<a class="navitab" href="http://www.codeslinger.co.uk/pages/projects/gameboy.html">Gameboy</a><span class="hide"> | </span>
+<a class="navitab" href="http://www.codeslinger.co.uk/pages/projects/chip8.html">Chip8</a><span class="hide"> | </span>
+<a class="navitab" href="http://www.codeslinger.co.uk/pages/blog/index.html">Blog</a><span class="hide"> | </span>
+</div>
+	
+<div id="desc">
+<h2>codeslinger.co.uk</h2>
+<p> Sega Master System - The Hardware.</p>
+
+</div>
+
+<div id="main">
+
+<h3><b>The Hardware:</b></h3>
+<p>
+
+Before we begin with the emulation it would be an idea to have a glimpse
+ of the hardware so you can see what you're letting yourself in for.<br><br>
+
+There are four main devices we will be emulating.
+
+</p><ul>
+<li>Processor: Z80</li>
+<li>VDP: TMS9918a</li>
+<li>Sound Chip: SN79489</li>
+<li>Joypad</li>
+</ul>
+
+<p></p>
+
+<h3><b>Timing:</b></h3>
+<p>
+In order for our emulator to have a decent compatibility it is vitally 
+important that the three main chips (processor, vdp and sound) 
+synchronise correctly. This will be controlled via knowing how many 
+machine clicks
+the SMS could perform a second, and knowing how many Z80 clock cycles 
+each instruction takes. Combining this together we can get our Z80 to 
+execute the same number of instructions per second as the real SMS. The 
+key to all this
+is knowing how many Z80 clock cycles the last emulated instruction took 
+and then we can convert this to SMS machine clicks and then convert it 
+to the VDP chip clock cycles and finally the sound chip clock cycles.<br><br>
+
+The main clock in the SMS runs at 10.738580 MHz. Which is 10738580 
+machine clicks every second. The Z80 processor runs at a third of the 
+speed of the main clock (3.58 MHz). The VDP runs at half the speed of 
+the main clock (5.36 MHz).
+The sound clock runs at the same speed as the Z80 processor (3.58 MHz).<br><br>
+
+There is one final piece of information you need to arm yourself with 
+before you are ready to create the main emulation loop is that the VDP 
+refreshes its screen 60 times a second. This means that every second the
+ screen gets drawn 60 times.
+Therefore if the main clock executes 10738580 machine clicks every 
+second then every frame of the VDP 10738580/60 machine clicks is 
+executed. So our emulator also needs to execute 60 frames a second but 
+because our PCs are now much faster
+than the SMS we need to slow our emulation loop down so the games play 
+at the correct speed. This is quite easy to do. If we code our main 
+emulation loop to emulate one frame at a time then after it has finished
+ emulating a frame it waits until 1/60th of a second
+has passed until it can emulate the next frame. By doing it this way our
+ emulator will draw exactly 60 frames every second. This means our main 
+emulation loop looks like this (I'll use pseudocode for now):
+
+</p><p class="code">
+
+void Emulator::MainLoop( )<br>
+{<br>
+&nbsp; const double SIXTYTH = 1000/60 ; // we're working in milliseconds<br>
+&nbsp; double lastFrameTime = 0 ;<br>
+&nbsp; while (notQuitting) // loop until the player quits<br>
+&nbsp; { <br>
+&nbsp;&nbsp; double currentTime = getCurrentTime( ) ; <br><br>
+
+&nbsp;&nbsp; // draw a frame every 1/60 of a second<br>
+&nbsp;&nbsp; if ((lastFrameTime + SIXTYTH) &lt;= currentTime)  <br>
+&nbsp;&nbsp; { <br>
+&nbsp;&nbsp;&nbsp; lastFameTime = currentTime ; <br>
+&nbsp;&nbsp;&nbsp; Update( ) ; // this will draw one frame <br>
+&nbsp;&nbsp; }<br>
+&nbsp; }<br>
+}<br><br><br>
+
+
+// this is responsible for emulating one frame<br>
+void Emulator::Update( )<br>
+{ <br>
+&nbsp; const double MACHINE_CLICKS_PER_FRAME = 10738580 / 60 ; <br>
+&nbsp; unsigned int clicksThisUpdate = 0 ;<br><br>
+
+&nbsp; // emulate 1/60th of a seconds amount of machine clicks<br>
+&nbsp; while (clicksThisUpdate &lt; MACHINE_CLICKS_PER_FRAME) <br>
+&nbsp; {<br>
+&nbsp;&nbsp; int z80ClockCycles = m_Z80.ExecuteNextInst(); <br><br>
+
+&nbsp;&nbsp; // the machine clock is 3 times faster than the z80 clock<br>
+&nbsp;&nbsp; int machineClicks = z80ClockCycles * 3 ;<br><br>
+
+&nbsp;&nbsp; // the vdp clock is half the speed of the machine clock<br>
+&nbsp;&nbsp; float vdpCycles = machineClicks / 2 ;<br><br>
+
+&nbsp;&nbsp; // the sound clock is the same speed as the z80<br>
+&nbsp;&nbsp; int soundCycles = z80ClockCycles ;<br><br>
+
+&nbsp;&nbsp; m_VDP.Update(vdpCycles) ;<br>
+&nbsp;&nbsp; m_Sound.Update(soundCycles) ;<br><br>
+
+&nbsp;&nbsp; clicksThisUpdate += machineClicks ;<br>
+&nbsp; }<br>
+}
+
+</p>
+
+The above code shows how the three main chips can be synchronised with 
+each other. You will notice that the type of VDP cycles is a float not 
+an integer. This is so we dont lose any accuracy over time with the 
+emulation of the VDP.
+
+ 
+<p></p>
+
+<h3><b>Ports:</b></h3>
+<p>
+
+The way that the games communicate with the four main devices is by 
+using the Z80 instructions IN and OUT. These instructions purpose is to 
+talk to the main four devices. The four devices will have port numbers 
+where reading and writing
+of data bytes pass through. So for example the following Z80 instruction
+ "INA 0x7e" reads port 0x7E and puts its return value into register A. I
+ will talk about this more later in the tutorials. All you need to know 
+for now is that
+reading and writing to the four main devices is done through ports. <br><br>
+
+The following is a break down of which port numbers map to which device:<br><br>
+
+0x7E : Reading: returns VDP V counter. Writing: writes data to Sound Chip <br>
+
+0x7F : Reading: returns VDP H counter. Writing: writes data to Sound Chip (mirror of above)<br>
+
+0xBE : Reading: reads VDP data port: Writing: writes vdp data port<br>
+
+0xBF : Reading: Gets VDP statis: Writing: writes to vdp control port<br>
+
+0xDC : Reading: Reads joypad 1. Writing: cannot write to<br>
+
+0xDD : Reading: Reads joypad 2. Writing: cannot write to <br><br>
+
+Port 0xBD does the same as port 0xBF. Port 0xC0 does the same as 0xDC and finally port 0xC1 does the same as 0xDD<br><br>
+
+So now you know how to control the execution of the devices and a basic 
+understanding of how the games interact with them. I will delve a lot 
+deeper into working with the ports in later sections of these tutorials.
+ For now it is time to move
+on and get started with the SMS emulation.
+
+
+
+</p>
+
+
+
+
+
+</div>
+
+<div id="sidebar">
+
+<h3>Master System Emulation:</h3>
+
+<p>
+<a class="sidelink" href="http://www.codeslinger.co.uk/pages/projects/mastersystem/resources.html">Resources</a><span class="hide"> | </span>
+<a class="sidelink" href="http://www.codeslinger.co.uk/pages/projects/mastersystem/hardware.html">The Hardware</a><span class="hide"> | </span>
+<a class="sidelink" href="http://www.codeslinger.co.uk/pages/projects/mastersystem/starting.html">Getting Started</a><span class="hide"> | </span>
+<a class="sidelink" href="http://www.codeslinger.co.uk/pages/projects/mastersystem/memory.html">Memory</a><span class="hide"> | </span>
+
+<a class="sidelink" href="http://www.codeslinger.co.uk/pages/projects/mastersystem/z80.html">Z80</a><span class="hide"> | </span>
+<a class="sidelink" href="http://www.codeslinger.co.uk/pages/projects/mastersystem/vdp.html">VDP</a><span class="hide"> | </span>
+<a class="sidelink" href="http://www.codeslinger.co.uk/pages/projects/mastersystem/joypads.html">Joypads</a><span class="hide"> | </span>
+<a class="sidelink" href="http://www.codeslinger.co.uk/pages/projects/mastersystem/interrupts.html">Interrupts</a><span class="hide"> | </span>
+<a class="sidelink" href="http://www.codeslinger.co.uk/pages/projects/mastersystem/sound.html">Sound</a><span class="hide"> | </span>
+<a class="sidelink" href="http://www.codeslinger.co.uk/pages/projects/mastersystem/finished.html">Finished Project</a><span class="hide"> | </span>
+
+</p>
+
+</div>
+    
+<div id="footer">
+Copyright © 2008 codeslinger.co.uk
+</div>
+
+</div>
+
+
+
+
+
+
+</body></html>

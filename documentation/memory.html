@@ -1,0 +1,436 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml" xml:lang="en" lang="en"><head>
+<meta http-equiv="content-type" content="text/html; charset=UTF-8">
+<meta name="description" content="_Emulation Programming_">
+<meta name="keywords" content="_Emulation,Chip8,Gameboy,NES,SNES,Genesis,Master,System,Mega,Drive_">
+<meta name="author" content="CodeSlinger /">
+<link rel="stylesheet" type="text/css" href="memory_files/css.css" media="screen,projection" title="CodeSlinger (screen)">
+<link rel="stylesheet" type="text/css" href="memory_files/print.css" media="print">
+<title>codeslinger.co.uk</title>
+</head>
+
+<body>
+<div>
+<br><br>
+</div>
+
+<div id="container">
+<div id="logo">
+<h1><a href="http://www.codeslinger.co.uk/index.html">codeslinger.co.uk</a></h1>
+</div>
+
+<div id="navitabs">
+<h2 class="hide">Site menu:</h2>
+<a class="navitab" href="http://www.codeslinger.co.uk/index.html">Home</a><span class="hide"> | </span>
+<a class="navitab" href="http://www.codeslinger.co.uk/pages/basics.html">Basics</a><span class="hide"> | </span>
+
+<a class="navitab" href="http://www.codeslinger.co.uk/pages/projects/N64.html">N64</a><span class="hide"> | </span>
+<a class="navitab" href="http://www.codeslinger.co.uk/pages/projects/megadrive.html">Mega Drive/Genesis</a><span class="hide"> | </span>
+<a class="activenavitab" href="http://www.codeslinger.co.uk/pages/projects/mastersystem.html">Master System</a><span class="hide"> | </span>
+<a class="navitab" href="http://www.codeslinger.co.uk/pages/projects/gameboy.html">Gameboy</a><span class="hide"> | </span>
+<a class="navitab" href="http://www.codeslinger.co.uk/pages/projects/chip8.html">Chip8</a><span class="hide"> | </span>
+
+<a class="navitab" href="http://www.codeslinger.co.uk/pages/blog/index.html">Blog</a><span class="hide"> | </span>
+</div>
+	
+<div id="desc">
+<h2>codeslinger.co.uk</h2>
+<p> Sega Master System - Memory.</p>
+
+</div>
+
+<div id="main">
+
+<h3><b>Memory Map:</b></h3>
+<p>
+
+The SMS address space is really quite simple compared to other video 
+games systems (like the gameboy). The following is the memory map:
+
+</p><p class="block">
+0x0000-0x3FFF : ROM Slot 1<br>
+0x4000-0x7FFF : Rom Slot 2<br>
+0x8000-0xBFFF : Rom Slot 3 / RAM Slot<br>
+0xC000-0xDFFF : RAM<br>
+0xE000-0xFFFF : Mirrored RAM
+</p>
+
+When the game is initialized rom page 0 should be in slot0, page 1 
+should be in slot 2 and page 2 should be in slot 3. It is important to 
+remember that even though these pages can be swapped in and out at any 
+point the first 0x400 bytes of slot 1 does not get paged out. This is 
+because the interupt handler routines are at this address space and they
+ need to always be present so interupts can get handled correctly. This 
+means that address range 0x0-0x400 is always data of page0 0x0-0x400<br><br>
+
+You cannot write to address range 0x0-0x8000 this is because this region
+ is for read only memory. You can only page data in and out of this 
+area. However slot 0x8000-0xBFFF (Slot 3) is also treated as read only 
+memory unless one of the two RAM banks is paged in there. This will be 
+discussed later.
+
+<p></p>
+
+<h3><b>Memory Mappers:</b></h3>
+<p>
+As stated above the ROM address spaces have 3 0x4000 byte slots 
+available for the game memory. The third of these slots can also be used
+ to page in a ram bank. There are two 0x4000 ram banks available. 
+Different games have different amounts of rom pages available. The rule 
+of thumb is the bigger the game the more pages that it can choose from. <br><br>
+
+The memory mapping registers are address 0xFFFC-0xFFFF<br><br>
+
+0xFFFC: Memory Control Register<br>
+0xFFFD: Writing a value to this address maps that values page into slot 1<br>
+0xFFFE: Writing a value to this address maps that values page into slot 2<br>
+0xFFFF: Writing a value to this address maps that values page into slot 3<br><br>
+
+I will discuss the memory control Register in a moment. The other three 
+registers are responsible for
+causing the paging of memory in and out of their respective slots. So 
+writing the value 0 to address 0xFFFE will result in page0 being paged 
+into slot2. Writing the value 0xA to 0xFFFD will result in page10 being 
+paged into slot1 with the exception of the first 0x400 bytes being not 
+paged because as mentioned earlier you cannot page the first 0x400 bytes
+ out of slot1. Writing to address 0xFFFF usually maps a rom page to slot
+ 3 however depending on the Memory Control Register it may end up being 
+ignored if RAM banking in slot 3 is enabled. RAM banking always takes 
+priority over ROM banking.<br><br>
+
+Because of RAM mirroring writing to address range 0xDFFC-0xDFFF mirrors 
+over the mapping registers 0xFFFC-0xFFFF. I personally do not mirror 
+address 0xDFFC-0xDFFF over memory control registers 0xFFFC-0xFFFF as 
+this has given bad results.
+
+</p>
+
+<h3><b>Memory Control Register:</b></h3>
+<p>
+Different bits in the Memory Control Register data byte (address 0xFFFC)
+ represent different settings for how the mapper is controlled. Although
+ all known software only ever uses bit 2 and 3. If bit 3 is set then RAM
+ is mapped into Page Slot 3 which will always override any rom banking 
+there. If bit 3 is not set the rom banking will happen in slot 3. If ram
+ banking is enabled then bit 2 of 0xFFFC selects which of the 2 ram 
+banks gets banked into slot 3. If the bit is "1" then the second ram 
+bank is used, otherwise the first.<br><br>
+
+Although the memory control register can have further uses, because no 
+games use them I shall not discuss them as I did not waste my time 
+emulating them.
+
+</p>
+
+<h3><b>Writing to Memory:</b></h3>
+<p>
+There are many Z80 instructions which result in data being written to 
+memory. It is good practice to always use the one function call when 
+writing to memory, this way it will be easy to trap memory access and 
+monitor it. This way we can make sure no data is written to ROM, we can 
+also make sure mirroring is handled correctly aswell as handing paging 
+instructions. The following is how I handle writing to memory:
+
+</p><p class="code">
+
+void Emulator::WriteMemory(const WORD&amp; address, const BYTE&amp; data)<br>
+{<br>
+&nbsp;&nbsp; // handle the codemasters memory mapping<br>
+&nbsp;&nbsp; if (m_IsCodeMasters)<br>
+&nbsp;&nbsp; {<br>
+&nbsp;&nbsp;&nbsp;&nbsp; if (address == 0x0 || address == 0x4000 || address == 0x8000)<br>		
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; DoMemPageCM(address,data) ;	<br>	
+&nbsp;&nbsp; }<br><br>
+
+&nbsp;&nbsp; // cant write to rom<br>
+&nbsp;&nbsp; if (address &lt; 0x8000)<br>
+&nbsp;&nbsp;&nbsp;&nbsp; return ;<br><br>
+
+&nbsp;&nbsp; // allow writing here if a ram bank is mapped into slot 3<br>
+&nbsp;&nbsp; else if (address &lt; 0xC000)<br>
+&nbsp;&nbsp; {<br>
+&nbsp;&nbsp;&nbsp;&nbsp; BYTE controlMap = m_InternalMemory[0xFFFC] ;<br>
+&nbsp;&nbsp;&nbsp;&nbsp; if (m_CurrentRam &gt; -1)<br>
+&nbsp;&nbsp;&nbsp;&nbsp; {<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; m_RamBank[m_CurrentRam][address-0x8000] = data ;<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; return ;<br>
+&nbsp;&nbsp;&nbsp;&nbsp; }<br>
+&nbsp;&nbsp;&nbsp;&nbsp; else<br>
+&nbsp;&nbsp;&nbsp;&nbsp; {<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; // this is rom so lets return<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; return ;<br>
+&nbsp;&nbsp;&nbsp;&nbsp; }<br>
+&nbsp;&nbsp; }<br><br>
+
+&nbsp;&nbsp; // it looks ok to write to memory<br>
+&nbsp;&nbsp; m_InternalMemory[address] = data ;<br><br>
+
+&nbsp;&nbsp; // handle standard memory paging<br>
+&nbsp;&nbsp; if (address &gt;= 0xFFFC)<br>
+&nbsp;&nbsp; {<br>
+&nbsp;&nbsp;&nbsp;&nbsp; if (!m_IsCodeMasters)<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; DoMemPage(address, data) ;<br>
+&nbsp;&nbsp; }<br><br>
+
+&nbsp;&nbsp; // handle mirroring<br>
+&nbsp;&nbsp; if (address &gt;= 0xC000 &amp;&amp; address &lt; 0xDFFC)<br>
+&nbsp;&nbsp;&nbsp;&nbsp; m_InternalMemory[address+0x2000] = data ;<br>
+&nbsp;&nbsp; if (address &gt;= 0xE000)<br>
+&nbsp;&nbsp;&nbsp;&nbsp; m_InternalMemory[address-0x2000] = data ;<br>
+}
+
+
+</p>
+
+Ignore the codemasters section at the top for now and lets concentrate 
+on the rest. The first thing to check for is if the game is trying to 
+write to ROM slots 1 or 2. If it is then we immediately return because 
+the game cannot write here. We then check to see if the game is trying 
+to write to slot 3. We can only allow writing to slot 3 if a ram bank is
+ enabled there so we need to check the memory control register at 
+address 0xFFFC. If Ram is banked into slot 3 then write to the ram bank 
+and exit, otherwise we must exit because if Ram isnt banked there then 
+rom is so we cannot write there. If the game is not attempting to write 
+to any of the 3 slots then we allow writing to ram and then check if we 
+need to handle memory paging which is the function called DoMemPage. 
+Once the memory paging is done we finally handle ram mirroring. 
+Hopefully that seemed simple enough.
+
+<p></p>
+
+<h3><b>Memory Paging:</b></h3>
+<p>
+Now we know how memory paging works lets see how to implement it. The 
+data being written to the paging registers contains the page number to 
+use. All games use bits 5-0 of the data byte to get the page number with
+ exception of the 1megabyte games wich use bits 6-0. Once we know the 
+page number we need to store this for the correct slot so when reading 
+from the slots we know which page to read from. For example if the page 
+number is 5 and the game is writing to address 0xFFFE then page 5 is 
+mapped into slot 2. It would be nice and easy to just memcpy the data 
+from page5 into slot 2 but this would be slow
+so it is better to just have a variable called m_SecondBankPage and set 
+it to 5. This way whenever the game
+tries to read from slot 2 we can use this variable as a lookup to find 
+the correct page in the cartridge memory to return the correct value.<br><br>
+
+The only other part left to handle is writing to the memory control 
+register (0xFFFC). We need to update the current ram bank if this 
+register gets written to. 
+
+</p><p class="code">
+
+void Emulator::DoMemPage(WORD address, BYTE data )<br>
+{<br>
+&nbsp;&nbsp; BYTE page = m_OneMegCartridge?data &amp; 0x3F: data &amp; 0x1F ;<br><br>
+
+&nbsp;&nbsp; switch(address)<br>
+&nbsp;&nbsp; {<br>
+&nbsp;&nbsp;&nbsp;&nbsp; case 0xFFFC:<br>
+&nbsp;&nbsp;&nbsp;&nbsp; {<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; // check for slot 2 ram banking<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; if (TestBit(data,3))<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; // which of the two ram banks are we swapping in?<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; TestBit(data,2)?m_CurrentRam = 1 : m_CurrentRam = 0 ;	<br>				
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; else	<br>			
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; m_CurrentRam = -1 ;<br>
+&nbsp;&nbsp;&nbsp;&nbsp; }<br>
+&nbsp;&nbsp;&nbsp;&nbsp; break ;<br><br>
+
+&nbsp;&nbsp;&nbsp;&nbsp; case 0xFFFD: m_FirstBankPage = page ; break ;<br>
+&nbsp;&nbsp;&nbsp;&nbsp; case 0xFFFE: m_SecondBankPage = page ; break ; <br>
+&nbsp;&nbsp;&nbsp;&nbsp; case 0xFFFF:<br>
+&nbsp;&nbsp;&nbsp;&nbsp; {<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; // only allow rom banking in slot 2 if ram is not mapped there!<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; if (false == TestBit(context-&gt;m_InternalMemory[0xFFFC],3))<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; m_ThirdBankPage = page ;<br>
+&nbsp;&nbsp;&nbsp;&nbsp; }<br>
+&nbsp;&nbsp;&nbsp;&nbsp; break ;<br>
+&nbsp;&nbsp; }<br>
+}
+
+
+</p>
+
+<p></p>
+
+
+<h3><b>Memory Paging - CodeMasters:</b></h3>
+<p>
+The codemasters game use their own mapper which luckily for us is 
+simpler than the standard sega mapper. First of all there is no ram 
+banking so only rom is
+mapped into slots 1-3. Also there is no need to protect address 
+0x0-0x400 in slot1 as this can be paged in and out by the mapper. The 
+mapper doesnt use registers 0xFFFC-0xFFFF to manage the mapper. Instead 
+it uses registers 0x0, 0x4000 and 0x8000. Writing to address 0x0 pages 
+slot 1, writing to 0x4000 pages
+slot 2 and writing to 0x8000 pages slot 3. Apart from this the mappers 
+are identical which gives us the following implementation
+
+</p><p class="code">
+
+void Emulator::DoMemPageCM(WORD address, BYTE data ) <br>
+{<br>
+&nbsp;&nbsp; BYTE page = m_OneMegCartridge?data &amp; 0x3F: data &amp; 0x1F ;<br>
+&nbsp;&nbsp; switch(address)<br>
+&nbsp;&nbsp; {<br>
+&nbsp;&nbsp;&nbsp;&nbsp; case 0x0: m_FirstBankPage = page ; break ;<br>
+&nbsp;&nbsp;&nbsp;&nbsp; case 0x4000: m_SecondBankPage = page ; break ;<br>
+&nbsp;&nbsp;&nbsp;&nbsp; case 0x8000: m_ThirdBankPage = page ; break ;<br>
+&nbsp;&nbsp; }<br>
+}
+
+</p>
+ 
+<p></p>
+
+<h3><b>Reading From Memory:</b></h3>
+<p>
+For the same reason that we want to control writing to memory we also 
+need to control reading from memory. I have already shown the memory map
+ the z80 address space, however I could of shown it in the more basic 
+form of: <br><br>
+
+0x0000-0xBFFF: Cartridge Memory<br>
+0xC000-0xFFFF: RAM<br><br>
+
+So when ever the z80 tries to read from memory it will always read from 
+its internal memory. Remember that the majority of rom sizes are larger 
+than 0xC000 bytes in memory so the entire rom cannot fit in the 
+Cartridge memory address region. This is why paging is needed so the 
+correct rom memory can be in the cartirdge memory address region when 
+needed. This means the Sega Master System always reads from internal 
+memory whether it wants to read cartridge memory or RAM and it needs to 
+do memory paging to make sure the correct cartridge memory is available.<br><br>
+
+I personally emulate this differently than how the SMS works. Instead of
+ memcpy'ing the the cartridge memory to internal memory whenever a page 
+change occurs I just store a variable of the new page that is active. 
+Then whenever the Rom tries to read from the cartridge memory address 
+space inside the internal memory I just lookup the data directly from 
+the cartridge memory. The reason why I do this is to avoid any slow 
+memcpy's. This then led me to write the following ReadMemory function:
+
+
+
+</p><p class="code">
+BYTE Emulator::ReadMemory(const WORD&amp; address)<br>
+{<br>
+&nbsp;&nbsp; WORD addr = address ;<br><br>
+
+&nbsp;&nbsp; // read from mirror 0xDFFC-0xDFFF not the memory map registers<br>
+&nbsp;&nbsp; if (addr&gt;=0xFFFC)<br>
+&nbsp;&nbsp;&nbsp;&nbsp; addr-=0x2000 ;<br><br>
+
+&nbsp;&nbsp; // the fixed memory address in slot 1<br>
+&nbsp;&nbsp; else if (!m_IsCodeMasters &amp;&amp; (addr &lt; 0x400))<br>
+&nbsp;&nbsp; {<br>
+&nbsp;&nbsp;&nbsp;&nbsp; return m_InternalMemory[addr] ;<br>
+&nbsp;&nbsp; }<br>
+&nbsp;&nbsp; // slot 1<br>
+&nbsp;&nbsp; else if (addr &lt; 0x4000)<br>
+&nbsp;&nbsp; {<br>
+&nbsp;&nbsp;&nbsp;&nbsp; // convert address to correct page address<br>
+&nbsp;&nbsp;&nbsp;&nbsp; unsigned int bankaddr = addr + (0x4000 * m_FirstBankPage) ;<br>
+&nbsp;&nbsp;&nbsp;&nbsp; return m_CartridgeMemory[bankaddr] ;<br>
+&nbsp;&nbsp; }<br>
+&nbsp;&nbsp; // slot 2<br>
+&nbsp;&nbsp; else if (addr &lt; 0x8000)<br>
+&nbsp;&nbsp; {<br>
+&nbsp;&nbsp;&nbsp;&nbsp; // convert address to correct page address<br>
+&nbsp;&nbsp;&nbsp;&nbsp; unsigned int bankaddr = addr + (0x4000 * m_SecondBankPage) ;<br>
+&nbsp;&nbsp;&nbsp;&nbsp; // remove offset<br>
+&nbsp;&nbsp;&nbsp;&nbsp; bankaddr-=0x4000 ;<br>
+&nbsp;&nbsp;&nbsp;&nbsp; return m_CartridgeMemory[bankaddr] ;<br>
+&nbsp;&nbsp; }<br>
+&nbsp;&nbsp; // slot 3<br>
+&nbsp;&nbsp; else if (addr &lt; 0xC000)<br>
+&nbsp;&nbsp; {<br>
+&nbsp;&nbsp;&nbsp;&nbsp; // is ram banking mapped in this slot?<br>
+&nbsp;&nbsp;&nbsp;&nbsp; if (m_CurrentRam &gt; -1)<br>
+&nbsp;&nbsp;&nbsp;&nbsp; {<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;  return m_RamBank[m_CurrentRam][addr-0x8000] ; // 0x8000 offset<br>
+&nbsp;&nbsp;&nbsp;&nbsp; }<br>
+&nbsp;&nbsp;&nbsp;&nbsp; else<br>
+&nbsp;&nbsp;&nbsp;&nbsp; {<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; // convert address to correct page address<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; unsigned int bankaddr = addr + (0x4000 * m_ThirdBankPage) ;<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; // remove offset<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; bankaddr-=0x8000 ;<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; return m_CartridgeMemory[bankaddr] ;<br>
+&nbsp;&nbsp;&nbsp;&nbsp; }<br>
+&nbsp;&nbsp; }<br><br>
+
+&nbsp;&nbsp; return m_InternalMemory[addr] ;<br>
+}
+</p>
+
+At first the above code looks a bit peculiar and I guess it is. What you
+ need to remember that the page variables represent a 0x4000 block of 
+memory in the cartridge memory. So page 0 starts at address 0x0 in the 
+cartridge memory and page 2 starts at address 0x8000 (0x4000 * 2). This 
+is how we find the correct page in memory, which is what the bankaddr 
+variable is for. You will notice that for slot 2 and 3 the bankaddr 
+variable has an offset removed from it. Remember that each page is 
+0x4000 bytes and we only want to read one of these bytes. If we wanted 
+to read byte 0x50 in slot 1 then we simply return bankAddr + 0x50 with 
+no offset for slots 1 page. However if we wanted to read byte 0x4050 
+this is essentially saying i want to read byte 0x50 from slot 2. This is
+ why 0x4000 is removed from the bank address. Lets have another example.
+ To read the 0xA byte from slot 3 the address would be 0x800A. So we get
+ the correct page by doing addr + (0x4000 * m_ThirdBankPage) to give us 
+the START point of that page. The address is 0x800A, the 0x8000 part has
+ been used to determines the slot and from this we can determine the 
+page (bankaddr), we then need to determine what byte in this page is 
+being referenced. The answer is 0x800A - 0x8000 which is 0xA. This is 
+why the offset is used.<br><br>
+
+Using this method whenever the game needs to do a memory read from ROM 
+it will always return the correct data from the current page in the 
+respective slot. If reading outside the slot area (0xC000 - 0xFFFF) then
+ we return from the internal z80 address space (internal memory) and 
+from from cartridge memory.<br><br>
+
+You will also notice that whenever I read from slot 3 I check to see if I
+ need to read from ROM (Cartridge memory) or a RAM bank. <br><br>
+
+<p></p>
+
+</div>
+
+<div id="sidebar">
+
+<h3>Master System Emulation:</h3>
+
+<p>
+<a class="sidelink" href="http://www.codeslinger.co.uk/pages/projects/mastersystem/resources.html">Resources</a><span class="hide"> | </span>
+<a class="sidelink" href="http://www.codeslinger.co.uk/pages/projects/mastersystem/hardware.html">The Hardware</a><span class="hide"> | </span>
+
+<a class="sidelink" href="http://www.codeslinger.co.uk/pages/projects/mastersystem/starting.html">Getting Started</a><span class="hide"> | </span>
+<a class="sidelink" href="http://www.codeslinger.co.uk/pages/projects/mastersystem/memory.html">Memory</a><span class="hide"> | </span>
+
+<a class="sidelink" href="http://www.codeslinger.co.uk/pages/projects/mastersystem/z80.html">Z80</a><span class="hide"> | </span>
+<a class="sidelink" href="http://www.codeslinger.co.uk/pages/projects/mastersystem/vdp.html">VDP</a><span class="hide"> | </span>
+
+<a class="sidelink" href="http://www.codeslinger.co.uk/pages/projects/mastersystem/joypads.html">Joypads</a><span class="hide"> | </span>
+<a class="sidelink" href="http://www.codeslinger.co.uk/pages/projects/mastersystem/interrupts.html">Interrupts</a><span class="hide"> | </span>
+<a class="sidelink" href="http://www.codeslinger.co.uk/pages/projects/mastersystem/sound.html">Sound</a><span class="hide"> | </span>
+<a class="sidelink" href="http://www.codeslinger.co.uk/pages/projects/mastersystem/finished.html">Finished Project</a><span class="hide"> | </span>
+
+</p>
+
+</div>
+    
+<div id="footer">
+Copyright © 2008 codeslinger.co.uk
+</div>
+
+</div>
+
+
+
+
+
+
+</body></html>

@@ -1,0 +1,533 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml" xml:lang="en" lang="en"><head>
+<meta http-equiv="content-type" content="text/html; charset=UTF-8">
+<meta name="description" content="_Emulation Programming_">
+<meta name="keywords" content="_Emulation,Chip8,Gameboy,NES,SNES,Genesis,Master,System,Mega,Drive_">
+<meta name="author" content="CodeSlinger /">
+<link rel="stylesheet" type="text/css" href="z80_files/css.css" media="screen,projection" title="CodeSlinger (screen)">
+<link rel="stylesheet" type="text/css" href="z80_files/print.css" media="print">
+<title>codeslinger.co.uk</title>
+</head>
+
+<body>
+<div>
+<br><br>
+</div>
+
+<div id="container">
+<div id="logo">
+<h1><a href="http://www.codeslinger.co.uk/index.html">codeslinger.co.uk</a></h1>
+</div>
+
+<div id="navitabs">
+<h2 class="hide">Site menu:</h2>
+<a class="navitab" href="http://www.codeslinger.co.uk/index.html">Home</a><span class="hide"> | </span>
+<a class="navitab" href="http://www.codeslinger.co.uk/pages/basics.html">Basics</a><span class="hide"> | </span>
+
+<a class="navitab" href="http://www.codeslinger.co.uk/pages/projects/N64.html">N64</a><span class="hide"> | </span>
+<a class="navitab" href="http://www.codeslinger.co.uk/pages/projects/megadrive.html">Mega Drive/Genesis</a><span class="hide"> | </span>
+<a class="activenavitab" href="http://www.codeslinger.co.uk/pages/projects/mastersystem.html">Master System</a><span class="hide"> | </span>
+<a class="navitab" href="http://www.codeslinger.co.uk/pages/projects/gameboy.html">Gameboy</a><span class="hide"> | </span>
+<a class="navitab" href="http://www.codeslinger.co.uk/pages/projects/chip8.html">Chip8</a><span class="hide"> | </span>
+
+<a class="navitab" href="http://www.codeslinger.co.uk/pages/blog/index.html">Blog</a><span class="hide"> | </span>
+</div>
+	
+<div id="desc">
+<h2>codeslinger.co.uk</h2>
+<p> Sega Master System - Z80.</p>
+
+</div>
+
+<div id="main">
+
+<h3><b>Z80 Info:</b></h3>
+<p>
+
+The z80 is an 8 bit microprocessor which is used in many early video 
+game systems (and many other systems). It has 8 standard registers, 8 
+shadow registers, 2 index registers, 1 refresh register and an interrupt
+ vector register. It also has a stack, program counter and 8 flags (only
+ 6 of which are used in the SMS Z80).<br><br>
+
+<u>The Registers</u><br>
+The 8 standard registers are named A,B,C,D,E,F,H,L. All are 8 bits and have different uses.
+
+</p><p class="block">
+A: Accumulator<br>
+B: General Purpose<br>
+C: General Purpose<br>
+D: General Purpose<br>
+E: General Purpose<br>
+F: Flag Register<br>
+H: Address register<br>
+L: Address register
+</p>
+
+
+However these registers can also be paired to form 4 sets of 16 bit 
+registers. The pairings are AF, BC, DE, HL. It is more common for 
+registers H and L to be used as a pair than as two seperate registers 
+because the z80 address space is 16 bits.<br><br>
+
+Althrough these registers have different uses we dont need to worry 
+about using them because it will be the ROM that uses them, we just need
+ to know which one is being used and the z80 instructions tell us this. 
+The only register we need to work with is the flag register. When 
+emulating the z80 instructions we need to check which flags (if any) the
+ instruction affects and then make sure the flag register gets set 
+accordingly.<br><br>
+
+There are also 8 shadow registers named A',B',C',D',E',F',H',L'. These 
+registers can also be paired to form 4 sets of 16 bit registers 
+AF',BC',DE',HL'. These registers cannot be modified directly by any z80 
+instruction. Their purpose is to be exchanged with their corresponding 
+standard registers. So if register pair AF value was 0xABCD and register
+ pair AF' value was 0x1234 then using an exchange instruction would swap
+ the values so AF is 0x1234 and AF' is 0xABCD. The programmer would 
+carry on using the AF registers through the Z80 instructions so the AF 
+value would no longer be 0x1234 and then they can exchange the registers
+ back so AF gets set back to its original value 0xABCD. Once again you 
+do not need to worry about the details of the use of these shadow 
+registers. Just make sure you emulate the exchange instructions 
+correctly.<br><br>
+
+The refresh register is a counter that gets incrememented each time an 
+opcode is fetched (including opcode prefixes which I'll explain later). 
+The purpose of this register is usually to generate random numbers.<br><br>
+
+The interrupt register works with interrupt mode 2 which as I explain 
+later is not used in the SMS so you do not need to emulate this<br><br>
+
+The two index registers IX and IY are used with two opcode prefixes 
+(explained later) which replaces the registers H and L in instructions 
+which use registers HL. For example ADD HL, HL would become ADD IX,IX 
+for one opcode prefix and ADD IY,IY for ther other. When an instruction 
+uses HL for memory accress (represented by (HL)) then an 8bit immediate 
+offset is added to registers IX and IY. This will all be explained 
+later.
+<br><br>
+<u>The Flags</u><br>
+Each bit in the 8 bit flag register (except bits 5 and 3 which arent used) represents a flag:
+
+<p class="block">
+Bit 7 = (S)Sign Flag<br>
+Bit 6 = (Z)Zero Flag<br>
+Bit 5 = Not used<br>
+Bit 4 = (H)Half Carry Flag<br>
+Bit 3 = Not used<br>
+Bit 2 = (P/V)Parity or Overflow Flag<br>
+Bit 1 = (N)Subrtract Flag<br>
+Bit 0 = (C)Carry Flag
+</p>
+
+The sign flag is simply a copy of the 7th bit of the result of a math 
+Z80 instruction. However with some 16bit instructions it will be a copy 
+of the 15th bit of the resulting operation.<br>
+The zero flag is set when the result of an operation is zero<br>
+The Half carry flag is set if a subtract operation carried from bit 4 to
+ bit 3 or, or with an 16 bit operation carried from bit 12 to 11. With 
+addition operations it is set if carried from bit 3 to 4 or with 16 bit 
+addition 11 to 12<br>
+The Parity or Overflow flag has two meanings. Some instructions use the 
+parity flag which means it gets set if the result of the operation has 
+an even number of bits set. The overflow flag is used by some 
+instructions when the 2-complement of the result does not fit within the
+ register<br>
+The subtract flag is simply set when the instruction is a subtraction<br>
+The carry flag is set when the instruction overflows its upper or lower limits.<br><br>
+
+I shall show how to emulate the settings of some of these flags when I show some opcode emulation examples below.<br><br>
+
+<u>Program Counter and Stack Pointer</u><br>
+
+The program counter points to the address of the next opcode in memory 
+to execute. The stack pointer points to the next address space where a 
+value that gets added to the stack is stored. The stack works down the 
+address space, it is initialized to address 0xDFF0 so if a value is 
+pushed on to the stack, this is the address it gets added to and the 
+stack pointer gets decremented to 0xDFEF. Popping values off the stack 
+will increment the stack pointer and return the value found at the new 
+position.<br><br>
+
+Because the z80 address space is 0x10000 in size (0x0-0xFFFF) both the 
+program counter and the stack pointer need to be a WORD in size.<br><br>
+
+<u>Emulation of the Z80</u><br>
+As previously mentioned the program counter and the stack pointer are 
+both words in size but so are the refresh register and the interrupt 
+register. These can easily be emulated with the following declarations:
+
+<p class="code">
+WORD m_ProgramCounter<br>
+WORD m_StackPointer<br>
+WORD m_RegisterR<br>
+WORD m_RegisterI
+</p>
+
+There are many ways to emulate the registers in code. One of the ways is
+ to represent each of the register pairs with a word variable and supply
+ a function for retrieving the hi and lo bytes for the individual 
+registers. Another way is the opposite and have 8 byte variables for 
+each register and then supply a function to combine these to form a word
+ to represent the pairings. However I prefer to use unions to emulate 
+the registers like so: 
+
+<p class="code">
+
+union Register<br>
+{<br>
+
+&nbsp; WORD reg ; <br>
+&nbsp; struct <br>
+&nbsp; {<br>
+&nbsp;&nbsp; BYTE lo ;<br>
+&nbsp;&nbsp; BYTE hi ;<br>
+&nbsp; };<br>
+
+};<br><br>
+
+Register m_RegisterAF ;<br>
+Register m_RegisterBC ; <br>
+Register m_RegisterDE ; <br>
+Register m_RegisterHL ; <br>
+Register m_RegisterAFShadow ;<br>
+Register m_RegisterBCShadow ; <br>
+Register m_RegisterDEShadow ; <br>
+Register m_RegisterHLShadow ; <br>
+Register m_RegisterIX ;<br>
+Register m_RegisterIY ;
+</p>
+
+Each field in a union occupies the same region in memory. So if you did 
+m_RegisterAF.reg = 0xAABB then m_RegisterAF.hi would equal 0xAA and 
+m_RegisterAF.lo would equal 0xBB.
+You could then do m_RegisterAF.lo = 0xCC and m_RegisterAF.hi would still
+ be 0xAA but m_RegisterAF.reg would be 0xAACC. This is perfect for 
+representing the registers because
+it gives easy access to the individual registers (with hi and lo fields)
+ and also as a pair (with reg field). You may be wondering why BYTE lo 
+is declared before BYTE hi. This
+is due to the <a href="http://en.wikipedia.org/wiki/Endianness">endianess</a> and you may have to declare hi before lo.
+
+<p></p>
+
+
+<h3><b>Instructions:</b></h3>
+<p>
+As previously mentioned the program counter points to the next opcode in
+ memory to execute. 
+The program counter is initialized to 0x0. The SMS will get the next 
+opcode from memory, execute the opcode and then increment the program 
+counter so it points to the next opcode to execute. However I prefer to 
+emulate this by retrieving the next opcode from memory and then 
+immediately incrementing the counter before executing the opcode. I do 
+this because the call and jump instructions set the program counter, so I
+ dont wish to then increment the program counter after the call and jump
+ instruction have set it.
+
+</p><p class="code">
+
+int Z80::ExecuteNextInst( )<br>
+{<br>
+&nbsp;&nbsp; m_Context.m_OpcodeCycles = 0 ;<br>
+&nbsp;&nbsp; BYTE instruction = ReadMemory(m_InternalMemory[m_Context.m_ProgramCounter]) ; <br>
+&nbsp;&nbsp; m_Context.m_ProgramCounter++ ;<br>
+&nbsp;&nbsp; ExecuteOpcode(instruction) ;<br>
+&nbsp;&nbsp; assert(m_Context.m_OpcodeCycles &gt; 0) ;<br>
+&nbsp;&nbsp; reurn m_Contex.m_OpcodeCycles ;<br>
+}
+
+</p>
+
+The m_Context variable is just a huge structure containing all the 
+variables I use for emulating the Z80 like the registers, program 
+counter etc. It also has an integer called m_OpcodeCycles which gets set
+ to the amount of Z80 clock cycles the executed instruction takes. The 
+assert is a nice way of detecting if any of my emulated instructions has
+ forgotten to set its cycle count. <br><br>
+
+The ExecuteOpcode function takes the opcode as a parameter and will 
+emulate the z80 opcode. It just contains a big swith statement which 
+looks up what the opcode is meant to do and emulates it. Using the 
+opcode table that I linked to on the "Resource" section of the SMS 
+tutorials I can give the following snippet of how the ExecuteOpcode 
+function behaves:
+
+<p class="code">
+void Z80::ExecuteOpcode(BYTE opcode)<br>
+{<br>
+&nbsp;&nbsp; IncrementRegR() ;<br>
+&nbsp;&nbsp; switch (opcode)<br>
+&nbsp;&nbsp; {<br>
+&nbsp;&nbsp;&nbsp;&nbsp; case 0x0: m_Context.m_OpcodeCycle = 4 ; break ; // no-op<br>
+&nbsp;&nbsp;&nbsp;&nbsp; case 0x8: Exchange(m_Context.m_RegisterAF.reg, m_Context.m_RegisterAFShadow.reg); break;<br>
+&nbsp;&nbsp;&nbsp;&nbsp; case 0x87: ADD_8BIT(m_Context.m_RegisterAF.hi, m_Context.m_RegisterAF.hi) ; break ;<br>
+&nbsp;&nbsp;&nbsp;&nbsp; case 0xC9: RETURN( ) ; break ;<br>
+&nbsp;&nbsp;&nbsp;&nbsp; case 0xBE: COMPARE(ReadMemory( m_Context.m_RegisterHL.reg) ); break ;<br>
+&nbsp;&nbsp;&nbsp;&nbsp; case 0xCB: ExecuteCBOpcode( ) ; break ;<br>
+&nbsp;&nbsp;&nbsp;&nbsp; default: assert(false); break ; // unhandled opcode<br>
+&nbsp;&nbsp; }<br>
+}
+</p> 
+
+This is just a snippet of the switch statement as the real thing has a 
+few hundred cases. Hopefully if you use that hex opcode resource I 
+mentioned you should understand all of the switch block. As I mentioned 
+earlier the R register is incremented everytime an opcode or an opcode 
+prefix is read, however once the lower 6 bits or the r register reaches 
+127 then the lower 6 bits of the r register are all set to 0.<br><br>
+
+<u>Opcode Prefixes:</u><br>
+Because the Z80 opcodes are a byte in size there are only 256 possible 
+instructions that can be used. However the developers got round this by 
+using opcode prefixes. Opcode 0xCB is an opcode prefix this means that 
+the next instruction is read from memory and this value represents a 
+different instruction. For example if the opcode 0x8 is read from memory
+ when executed this instruction means "Exchange AF with AFShadow". 
+However if instruction 0xCB is read then another opcode is immediately 
+read, and if this new opcode was 0x8 it would not be the exchange 
+instruction, it would be a "RRC" instruction. This way by using opcode 
+prefix 0xCB the developers now had access to an extra 256 instructions 
+because they could reuse the values. Once again look at that Opcode hex 
+values resource I link to in the "Resource" section of this site and 
+look at how opcode 0x8 in the first table (the standard opcode table) 
+means "EX AF,AF'" and now look at the second table (the CB prefix table)
+ and notice how opcode 0x8 is "RRC b". This means our ExecuteCBOpcode 
+function which I've used in that switch block above can be implemented 
+like this:
+
+<p class="code">
+void Z80::ExecuteCBOpcode()<br>
+{<br>
+&nbsp;&nbsp; BYTE opcode = ReadMemory(m_InternalMemory[m_Context.m_ProgramCounter]) ;<br>
+&nbsp;&nbsp; m_Context.m_ProgramCounter++; <br>
+&nbsp;&nbsp; IncrementRegR() ;<br>
+&nbsp;&nbsp; switch (opcode)<br>
+&nbsp;&nbsp; {<br>
+&nbsp;&nbsp;&nbsp;&nbsp; case 0x8: RRC(m_Context.m_RegisterB.hi); break ;<br>
+&nbsp;&nbsp;&nbsp;&nbsp; default: assert(false); break ; // unhandled opcode<br>
+&nbsp;&nbsp; }<br>
+}
+</p>
+
+Hopefully the above code snippet helps claifry the prefixes. There are 
+more opcode prefixes that behave in the same way to the 0xCB prefix. 
+These are called 0xED,0xDD,0xFD. The first one 0xED has its own unique 
+opcodes like 0xCB does and these can be found on the same resouce as I 
+mentioned above. The 0xDD and 0xFD are quite strange. These prefix 
+behave EXACTLY the same as the standard opcode with the exception that 
+where registers HL were used before we now need to use registers IX for 
+prefix 0xDD and registers IY for prefix 0xFD. For example standard 
+opcode 0x2B is "DEC HL", so opcodes 0xDD 0x2B is "DEC IX". There is just
+ one further catch though. If the standard opcode referred to a memory 
+address with HL (you can tell because the opcode will show HL in 
+brackets like (HL) ) then the same goes for IX and IY but an 8 bit 
+offset is added onto the IX and IY addresses. For example standard 
+opcode 0xBE is "CP (HL)" whereas prefix opcode 0xFD 0xBE is "CP 
+(IY+offset)". The offset is simply the next byte in memory that the 
+program counter is pointing to, however it needs to be treated as a 
+SIGNED BYTE.
+
+<p class="code">
+void Z80::ExecuteDDOpcode()<br>
+{<br>
+&nbsp;&nbsp; BYTE opcode = ReadMemory(m_InternalMemory[m_Context.m_ProgramCounter]) ;<br>
+&nbsp;&nbsp; m_Context.m_ProgramCounter++; <br>
+&nbsp;&nbsp; IncrementRegR() ;<br>
+&nbsp;&nbsp; switch (opcode)<br>
+&nbsp;&nbsp; {<br>
+&nbsp;&nbsp;&nbsp;&nbsp; case 0x2B: DEC(m_Context.m_RegisterIX); break; <br>
+&nbsp;&nbsp;&nbsp;&nbsp; case 0xBE: COMPARE(ReadMemory( GetIXIYOffset(m_Context.m_RegisterIX)) ); break ;<br>
+&nbsp;&nbsp;&nbsp;&nbsp; default: assert(false); break ; // unhandled opcode<br>
+&nbsp;&nbsp; }<br>
+}<br><br>
+
+WORD Z80::GetIXIYAddress(WORD ixiy)<br>
+{<br>
+&nbsp;&nbsp; SIGNED_BYTE offset = ReadMemory(m_InternalMemory[m_Context.m_ProgramCounter]) ;<br>
+&nbsp;&nbsp; m_Context.m_ProgramCounter++; <br>
+&nbsp;&nbsp; return ixiy + offset ;<br>
+}
+
+</p>
+
+As you can see the compare instruction argument is the IX register plus 
+the offset (which is retrieved from GetIXIYAddress function) and is used
+ as an address for the ReadMemory function. If you look at this 
+implementation for opcode 0xBE compared to the one I gave earlier in the
+ standard opcode switch block, hopefully it makes sense.<br><br>
+
+Of course with all rules there are a few exceptions. "JMP (HL)" does not
+ have the offset added to it for 0xDD and 0xFD prefixes, so it is 
+"JMP(IX)" and "JMP (IY)". Also the "EX DE,HL" instruction is not 
+affected by the 0xDD and 0xFD prefixes (meaning HL stays as HL).<br><br>
+
+<u>Flag awareness</u><br>
+There are a few opcodes which behave differently based on the current 
+flag status. For example "JMP z" will jump to a specific address if the z
+ flag is set, otherwise it will not jump. Similary "CALL nc" will call a
+ function if the carry flag isnt set, otherwise it will not call. Be 
+aware that these instructions carry with them a different clock cycle 
+count if it goes one way or another. To get the opcodes clock cycle 
+count look at the T-States of the Sean Young documentation "Z80 info" in
+ the resource section of my site.<br><br>
+
+You will also notice that there are few peculiar instructions like "JMP 
+m" and "CALL pe". This is what the following letters mean:
+
+<p class="block">
+m = S flag is set <br>
+po = P/V flag is off<br>
+p = S flag is off <br>
+pe = P/V flag is set
+</p>
+
+<p></p>
+
+<h3><b>Opcode Examples:</b></h3>
+<p>
+Now we have the switch blocks setup it is time to emulate the functions 
+they call. In our first switch statement the EXCHANGE function is 
+called, and this is its implementation:
+
+</p><p class="code">
+
+void Z80::Exchange(WORD&amp; ex1, WORD&amp; ex2)<br>
+{<br>
+WORD temp = ex1 ;<br>
+ex1 = ex2 ;<br>
+ex2 = temp ;<br>
+m_Context.m_OpcodeCycle = 4; <br>
+}
+
+</p>
+
+The above Exhange function shows how to emulate the Z80 exchange 
+instructions, it can be used for EX AF, AF' aswell as the other exchange
+ instructions.<br><br>
+
+The next function shows how to emulate the JR (jump immediate 
+instruction). There are two types of JR instructions, the first type 
+will always jump and the second type will only jump if a certain 
+condition is true. We can emulate it like this: 
+
+<p class="code">
+
+void Z80::CPU_JUMP_IMMEDIATE(bool useCondition, int flag, bool condition)<br>
+{<br>
+&nbsp;&nbsp; m_Context.m_OpcodeCycle= 12 ;<br><br>
+
+&nbsp;&nbsp; if (!useCondition)<br>
+&nbsp;&nbsp; {<br>
+&nbsp;&nbsp;&nbsp;&nbsp; SIGNED_BYTE n = (SIGNED_BYTE)ReadMemory(m_Context.m_ProgramCounter) ;<br><br>
+
+&nbsp;&nbsp;&nbsp;&nbsp; m_Context.m_ProgramCounter += n;<br>
+&nbsp;&nbsp; }<br>
+&nbsp;&nbsp; else if (TestBit(m_Context.m_RegisterAF.lo, flag) == condition)<br>
+&nbsp;&nbsp; {<br>
+&nbsp;&nbsp;&nbsp;&nbsp; SIGNED_BYTE n = (SIGNED_BYTE)m_Context.ReadMemory(m_Context.m_ProgramCounter) ;<br><br>
+
+&nbsp;&nbsp;&nbsp;&nbsp; m_Context.m_ProgramCounter += n ;<br>
+&nbsp;&nbsp; }<br>
+&nbsp;&nbsp; else<br>
+&nbsp;&nbsp; {<br>
+&nbsp;&nbsp;&nbsp;&nbsp; m_Context.m_OpcodeCycle= 7 ;<br>
+&nbsp;&nbsp; }<br><br>
+
+&nbsp;&nbsp; m_Context.m_ProgramCounter++ ;<br>
+}
+
+</p>
+
+So the above function will jump always if no condition is used, 
+otherwise it will test the condition (tests whether a flag is set or not
+ set) and if so it jumps or doesnt jump. Notice how the opcode cycle 
+counter is set lower if it doesnt jump? This is because it never reads 
+from memory which would require more clock cycles.<br><br>
+
+The next example shows how the 8 bit decrement function works. It 
+decrements the register being passed as an argument then sets all the 
+flags.
+
+<p class="code">
+
+void Z80::CPU_8BIT_DEC(BYTE&amp; reg, int cycles)<br>
+{<br>
+&nbsp;&nbsp; m_Context.m_OpcodeCycle = cycles ;<br><br>
+
+&nbsp;&nbsp; BYTE before = reg ;<br><br>
+
+&nbsp;&nbsp; reg-- ;<br><br>
+
+&nbsp;&nbsp; // set z flag if result is negative<br>
+&nbsp;&nbsp; if (reg == 0)<br>
+&nbsp;&nbsp;&nbsp;&nbsp; m_Context.m_RegisterAF.lo = BitSet(m_Context.m_RegisterAF.lo, FLAG_Z) ;<br>
+&nbsp;&nbsp; else<br>
+&nbsp;&nbsp;&nbsp;&nbsp; m_Context.m_RegisterAF.lo = BitReset(m_Context.m_RegisterAF.lo, FLAG_Z) ;<br><br>
+
+&nbsp;&nbsp; // set h flag if lower nibble is 0, meaning it will carry from bit 4<br>
+&nbsp;&nbsp; if ((before &amp; 0x0F) == 0)<br>
+&nbsp;&nbsp;&nbsp;&nbsp; m_Context.m_RegisterAF.lo = BitSet(m_Context.m_RegisterAF.lo, FLAG_H) ;<br>
+&nbsp;&nbsp; else<br>
+&nbsp;&nbsp;&nbsp;&nbsp; m_Context.m_RegisterAF.lo = BitReset(m_Context.m_RegisterAF.lo, FLAG_H) ;<br><br>
+
+&nbsp;&nbsp; // v is calculated not p<br>
+&nbsp;&nbsp; if (before == -128)<br>
+&nbsp;&nbsp;&nbsp;&nbsp; m_Context.m_RegisterAF.lo = BitSet(m_Context.m_RegisterAF.lo, FLAG_PV) ;<br>
+&nbsp;&nbsp; else<br>
+&nbsp;&nbsp;&nbsp;&nbsp; m_Context.m_RegisterAF.lo = BitReset(m_Context.m_RegisterAF.lo, FLAG_PV) ;<br><br>
+
+&nbsp;&nbsp; // set subtract flag<br>
+&nbsp;&nbsp; m_Context.m_RegisterAF.lo = BitSet(m_Context.m_RegisterAF.lo, FLAG_N) ;<br><br>
+
+&nbsp;&nbsp; // set sign flag to bit 7 of the result<br>
+&nbsp;&nbsp; if (TestBit(reg,7))<br>
+&nbsp;&nbsp;&nbsp;&nbsp; m_Context.m_RegisterAF.lo = BitSet(m_Context.m_RegisterAF.lo, FLAG_S) ;<br>
+&nbsp;&nbsp; else<br>
+&nbsp;&nbsp;&nbsp;&nbsp; m_Context.m_RegisterAF.lo = BitReset(m_Context.m_RegisterAF.lo, FLAG_S) ;<br>
+}
+
+</p>
+
+<p></p>
+
+
+</div>
+
+<div id="sidebar">
+
+<h3>Master System Emulation:</h3>
+
+<p>
+<a class="sidelink" href="http://www.codeslinger.co.uk/pages/projects/mastersystem/resources.html">Resources</a><span class="hide"> | </span>
+<a class="sidelink" href="http://www.codeslinger.co.uk/pages/projects/mastersystem/hardware.html">The Hardware</a><span class="hide"> | </span>
+
+<a class="sidelink" href="http://www.codeslinger.co.uk/pages/projects/mastersystem/starting.html">Getting Started</a><span class="hide"> | </span>
+<a class="sidelink" href="http://www.codeslinger.co.uk/pages/projects/mastersystem/memory.html">Memory</a><span class="hide"> | </span>
+
+<a class="sidelink" href="http://www.codeslinger.co.uk/pages/projects/mastersystem/z80.html">Z80</a><span class="hide"> | </span>
+<a class="sidelink" href="http://www.codeslinger.co.uk/pages/projects/mastersystem/vdp.html">VDP</a><span class="hide"> | </span>
+
+<a class="sidelink" href="http://www.codeslinger.co.uk/pages/projects/mastersystem/joypads.html">Joypads</a><span class="hide"> | </span>
+<a class="sidelink" href="http://www.codeslinger.co.uk/pages/projects/mastersystem/interrupts.html">Interrupts</a><span class="hide"> | </span>
+<a class="sidelink" href="http://www.codeslinger.co.uk/pages/projects/mastersystem/sound.html">Sound</a><span class="hide"> | </span>
+<a class="sidelink" href="http://www.codeslinger.co.uk/pages/projects/mastersystem/finished.html">Finished Project</a><span class="hide"> | </span>
+
+</p>
+
+</div>
+    
+<div id="footer">
+Copyright © 2008 codeslinger.co.uk
+</div>
+
+</div>
+
+
+
+
+
+
+
+</body></html>

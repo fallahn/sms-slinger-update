@@ -1,0 +1,226 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml" xml:lang="en" lang="en"><head>
+<meta http-equiv="content-type" content="text/html; charset=UTF-8">
+<meta name="description" content="_Emulation Programming_">
+<meta name="keywords" content="_Emulation,Chip8,Gameboy,NES,SNES,Genesis,Master,System,Mega,Drive_">
+<meta name="author" content="CodeSlinger /">
+<link rel="stylesheet" type="text/css" href="interrupts_files/css.css" media="screen,projection" title="CodeSlinger (screen)">
+<link rel="stylesheet" type="text/css" href="interrupts_files/print.css" media="print">
+<title>codeslinger.co.uk</title>
+</head>
+
+<body>
+<div>
+<br><br>
+</div>
+
+<div id="container">
+<div id="logo">
+<h1><a href="http://www.codeslinger.co.uk/index.html">codeslinger.co.uk</a></h1>
+</div>
+
+<div id="navitabs">
+<h2 class="hide">Site menu:</h2>
+<a class="navitab" href="http://www.codeslinger.co.uk/index.html">Home</a><span class="hide"> | </span>
+<a class="navitab" href="http://www.codeslinger.co.uk/pages/basics.html">Basics</a><span class="hide"> | </span>
+<a class="navitab" href="http://www.codeslinger.co.uk/pages/projects/N64.html">N64</a><span class="hide"> | </span>
+<a class="navitab" href="http://www.codeslinger.co.uk/pages/projects/megadrive.html">Mega Drive/Genesis</a><span class="hide"> | </span>
+<a class="activenavitab" href="http://www.codeslinger.co.uk/pages/projects/mastersystem.html">Master System</a><span class="hide"> | </span>
+<a class="navitab" href="http://www.codeslinger.co.uk/pages/projects/gameboy.html">Gameboy</a><span class="hide"> | </span>
+<a class="navitab" href="http://www.codeslinger.co.uk/pages/projects/chip8.html">Chip8</a><span class="hide"> | </span>
+<a class="navitab" href="http://www.codeslinger.co.uk/pages/blog/index.html">Blog</a><span class="hide"> | </span>
+</div>
+	
+<div id="desc">
+<h2>codeslinger.co.uk</h2>
+<p> Sega Master System - Interrupts.</p>
+
+</div>
+
+<div id="main">
+
+<h3><b>Interrupts:</b></h3>
+<p>
+
+There are three different interrupt mechinisms the Z80 can use but the SMS only uses one of them (interrupt mode 1).<br><br>
+
+The sega master system has 3 hardware interrupts. A hardware interrupt 
+is a way that the a piece of hardware can signal the CPU to stop doing 
+what it is currently doing and start doing something else. It is a way
+of achieving multitasking. There are two types of interrupts, maskable 
+interrupts and none-maskable interrupts. The difference is that you can 
+disable maskable interrupts from interrupting the CPU but you cannot 
+stop a none maskable interrupt.
+Whenever a none maskable interrupt occurs the CPU will stop doing what 
+its doing and service it. An interrupt gets serviced by the CPU pushing 
+its current program counter on to the stack and jumping to the address 
+of the Interrupt Handler. When it has finished
+servicing the interrupt handler it will set its program counter back to 
+what it was before the interrupt occurred and then carry on where it 
+left off.<br><br>
+
+</p>
+
+<h3><b>Maskable Interrupts:</b></h3>
+<p>
+The Z80 has two interrupt status flip flops which I will call FF1 and 
+FF2. If FF1 is set then maskable interrupts are enabled and can be 
+signalled at any time. When FF1 is not set then the maskable interrupts 
+will not get serviced until FF1 becomes set. However
+it is important to know that if FF1 is not set and an interrupt is being
+ requested, by the time FF1 becomes set again that same interrupt may no
+ longer be requesting to be serviced so that interrupt would never have 
+got serviced. Before I explain what FF2 does i'll mention
+that a none maskable interrupt always takes priority over a maskable 
+interrupt. So when a none maskable interrupt is signalled FF1 is set to 
+off so no maskable interrupts can interrupt the current servicing of the
+ none maskable interrupt. When a none maskable interrupt is signalled
+FF2 becomes the value of FF1 and FF1 is set to off. This way when the 
+none maskable interrupt finishes and returns with a Z80 RETI instruction
+ FF1 is set back to what it was before the none maskable interrupt was 
+serviced which is the value of FF2. The following shows how the Z80 
+instructions affect
+the flip flops:<br><br>
+
+EI (enable interrupts): FF1 = on and FF2 = on <br>
+DI (disable interrupts): FF1 = off and FF2 = off<br>
+RETI (return from interrupt routine): FF1 = FF2  <br><br>
+
+Actually EI doesnt change the value of FF1 and FF2 to "on" until the instruction after EI. <br><br>
+
+There are two maskable interrupts that can occur in the SMS and they are
+ both signaled from the VDP. The first interrupt is the vertical sync 
+interrupt. This occurs when the V counter first moves out of the active 
+display area to the none active display area. As discussed in the VDP 
+section
+of these tutorials when this happens a bit in the VDP status register is
+ set showing the VDP is requesting an interrupt. However it will only 
+request an interrupt if vertical sync interrupts are enabled in the 
+appropriate VDP register, this also was discussed and implemented in the
+ VDP section. <br><br>
+
+The second maskable interrupt is the line counter. The game can set the 
+line counter to any value whilst the vdp is outside of the active 
+display period (except the first line of the none active display 
+period). When the vdp is in the active display period (also the first 
+line of the none active display period) the line counters value is 
+decremented each time the v counter moves onto the next line. When the 
+line counters
+value goes less than 0 then its value is reset to what it started at and
+ a line interrupt is requested. All this was discussed in more detail in
+ the VDP section of these tutorials.<br><br>
+
+One important difference between the vsync interrupt and the line 
+interrupt is that the vsync interrupt will constantly request to be 
+serviced whilst the vsync bit is set in the vdp status register and 
+vsync interrupts are enabled in the appropriate vdp register. However 
+with a line interrupt it is requested once
+and forgotten about until it occurs again.<br><br>
+
+The VDP can keep requesting interrupts but until FF1 is set to "on" then
+ none of them will get serviced. When an interrupt has been accepted for
+ being serviced (FF1 is on) then the current program counter is pushed 
+onto the stack and the program counter is set to 0x38 which is the 
+address of the interrupt handling routine.
+
+</p>
+
+<h3><b>None Maskable Interrupts:</b></h3>
+<p>
+
+There is only one none maskable interrupt called the "Reset Interrupt". 
+This occurs when the player pushes the reset button on the control pad. 
+The way to emulate this is to have a boolean variable (from here on 
+referred to as m_ResetInterrupt) which is set to true when the reset 
+button is pushed, and then the main emulation loop should check this 
+variable
+after every instruction it emulates. As previously mentioned you cannot 
+turn off none maskable interrupts and they have a higher priority than 
+maskable interrupts. When a none maskable interrupt is signalled the CPU
+ pushes its program counter on to the stack and jumps to the interrupt 
+handler for the none maskable interrupt which is address 0x66.
+
+</p>
+
+<h3><b>Handling Interrupts:</b></h3>
+<p>
+
+In the "Getting Started" section of these tutorials I mentioned that I 
+still need to implement the HandleInterrupts function in the main 
+emulation loop. Now we have armed ourselves with all the information 
+needed for implementing this function we can finally do it:
+
+</p><p class="code">
+
+void Emulator::HandleInterrupts()<br>
+{<br>
+&nbsp; if (m_ResetInterrupt &amp;&amp; !m_ServicingReset)<br>
+&nbsp; {<br>
+&nbsp;&nbsp; m_ServicingReset = true ;<br>
+&nbsp;&nbsp; m_ResetInterrupt = false ;<br>
+&nbsp;&nbsp; FF1 = false ; <br>
+&nbsp;&nbsp; m_Halted = false ; <br>
+&nbsp;&nbsp; PushWordOntoStack(m_ProgramCounter) ;<br>
+&nbsp;&nbsp; m_ProgramCounter = 0x66 ;<br>
+&nbsp; }<br><br>
+
+&nbsp; if (m_GraphicsChip.IsRequestingInterupt())<br>
+&nbsp; {<br>
+&nbsp;&nbsp; if (FF1 &amp;&amp; m_InteruptMode == 1)<br>
+&nbsp;&nbsp; {<br>
+&nbsp;&nbsp;&nbsp; m_Halted = false ;<br>
+&nbsp;&nbsp;&nbsp; PushWordOntoStack(m_ProgramCounter) ;<br>
+&nbsp;&nbsp;&nbsp; m_ProgramCounter = 0x38 ;<br>
+&nbsp;&nbsp;&nbsp; m_IFF1 = false ;<br>
+&nbsp;&nbsp;&nbsp; m_IFF2 = false ;<br>
+&nbsp;&nbsp; }<br>
+&nbsp; }<br>
+}
+</p>
+
+Remember that the game can sit and wait for an interrupt to happen by 
+calling the HALT instruction. This means no other instruction will be 
+executed until an interrupt occurs. This is why we
+set the m_Halted variable back to false so the cpu can then start 
+executing instructions again. You will have also noticed that I have an 
+extra boolen variable called m_ServicingReset. This simply stops another
+ reset interrupt from occuring whilst
+a previous reset interrupt is currently being serviced.<br><br>
+
+<p></p>
+
+</div>
+
+<div id="sidebar">
+
+<h3>Master System Emulation:</h3>
+
+<p>
+<a class="sidelink" href="http://www.codeslinger.co.uk/pages/projects/mastersystem/resources.html">Resources</a><span class="hide"> | </span>
+<a class="sidelink" href="http://www.codeslinger.co.uk/pages/projects/mastersystem/hardware.html">The Hardware</a><span class="hide"> | </span>
+<a class="sidelink" href="http://www.codeslinger.co.uk/pages/projects/mastersystem/starting.html">Getting Started</a><span class="hide"> | </span>
+<a class="sidelink" href="http://www.codeslinger.co.uk/pages/projects/mastersystem/memory.html">Memory</a><span class="hide"> | </span>
+
+<a class="sidelink" href="http://www.codeslinger.co.uk/pages/projects/mastersystem/z80.html">Z80</a><span class="hide"> | </span>
+<a class="sidelink" href="http://www.codeslinger.co.uk/pages/projects/mastersystem/vdp.html">VDP</a><span class="hide"> | </span>
+<a class="sidelink" href="http://www.codeslinger.co.uk/pages/projects/mastersystem/joypads.html">Joypads</a><span class="hide"> | </span>
+<a class="sidelink" href="http://www.codeslinger.co.uk/pages/projects/mastersystem/interrupts.html">Interrupts</a><span class="hide"> | </span>
+<a class="sidelink" href="http://www.codeslinger.co.uk/pages/projects/mastersystem/sound.html">Sound</a><span class="hide"> | </span>
+<a class="sidelink" href="http://www.codeslinger.co.uk/pages/projects/mastersystem/finished.html">Finished Project</a><span class="hide"> | </span>
+
+</p>
+
+</div>
+    
+<div id="footer">
+Copyright © 2008 codeslinger.co.uk
+</div>
+
+</div>
+
+
+
+
+
+
+</body></html>
