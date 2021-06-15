@@ -25,8 +25,8 @@
 
 #pragma once
 
-#include <SDL/SDL.h>
-#include <SDL/SDL_opengl.h>
+#include <SDL2/SDL.h>
+#include <SDL2/SDL_opengl.h>
 
 #include <memory>
 
@@ -49,7 +49,7 @@ private:
             void                InitGL();
             void                RenderGame();
             void                RomLoop(int fps);
-            void                HandleInput(const SDL_Event& event);
+            bool                HandleInput(const SDL_Event& event);
             
 
     static  std::unique_ptr<MasterSystem>       m_Instance;

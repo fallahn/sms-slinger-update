@@ -28,11 +28,16 @@
 #include "Emulator.hpp"
 #include "TMS9918A.hpp"
 
+#include <iostream>
+
 namespace
 {
     constexpr int WINDOWWIDTH = 256;
     constexpr int WINDOWHEIGHT = 192;
     constexpr int SCREENSCALE = 1;
+
+    SDL_Window* window = nullptr;
+    SDL_GLContext ctx = nullptr;
 }
 
 /////////////////////////////////////////////////////////////////////////
@@ -69,14 +74,25 @@ bool MasterSystem::CreateSDLWindow()
     {
         return false;
     }
-    if(SDL_SetVideoMode(m_Width, m_Height, 8, SDL_OPENGL) == nullptr)
+
+    window = SDL_CreateWindow("Sega Master System", 
+        SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED, 
+        m_Width, m_Height, SDL_WINDOW_SHOWN | SDL_WINDOW_OPENGL);
+    
+    if (window == nullptr)
     {
+        std::cout << SDL_GetError() << std::endl;
+        return false;
+    }
+
+    ctx = SDL_GL_CreateContext(window);
+    if (ctx == nullptr)
+    {
+        std::cout << SDL_GetError() << std::endl;
         return false;
     }
 
     InitGL();
-
-    SDL_WM_SetCaption("Sega Master System", nullptr);
     return true;
 }
 
@@ -88,8 +104,8 @@ void MasterSystem::InitGL()
     glMatrixMode(GL_MODELVIEW);
     glLoadIdentity();
     glOrtho(0, m_Width, m_Height, 0, -1.0, 1.0);
-    glClearColor(0, 0, 0, 1.0);
-    glClear(GL_COLOR_BUFFER_BIT|GL_DEPTH_BUFFER_BIT);
+    glClearColor(0.f, 0.f, 1.f, 1.f);
+    glClear(GL_COLOR_BUFFER_BIT);
     glShadeModel(GL_FLAT);
 
     glEnable(GL_TEXTURE_2D);
@@ -138,7 +154,7 @@ bool LogFrameRate()
         char buffer[255];
         sprintf(buffer, "FPS %d", count);
         count = 0;
-        SDL_WM_SetCaption(buffer, nullptr);
+        SDL_SetWindowTitle(window, buffer);
         res = true;
     }
     count++;
@@ -151,7 +167,7 @@ void MasterSystem::RomLoop(int fps)
 {
     bool quit = false;
     SDL_Event event;
-    bool sync=true;
+    bool sync = true;
 
     if (fps == -1)
     {
@@ -162,35 +178,36 @@ void MasterSystem::RomLoop(int fps)
 
     while (!quit)
     {
-        SDL_PollEvent(&event);
-        
-        HandleInput(event);
-
-        if(event.type == SDL_QUIT)
+        while (SDL_PollEvent(&event))
         {
-            quit = true;
+            if (event.type == SDL_QUIT
+                || HandleInput(event))
+            {
+                quit = true;
+            }
         }
 
         unsigned int current = SDL_GetTicks();
 
-
-        if (sync && (time2+(1000/fps))<current)
+        if (sync && (time2 + (1000 / fps)) < current)
         {
             m_Emulator->Update();
             RenderGame();
-            time2=current;
+            time2 = current;
             if (LogFrameRate())
             {
                 m_Emulator->DumpClockInfo();
             }
         }
-        else if(!sync)
+        else if (!sync)
         {
             m_Emulator->Update();
             RenderGame();
             LogFrameRate();
         }
     }
+
+    SDL_GL_DeleteContext(ctx);
     SDL_Quit();
 }
 
@@ -208,10 +225,10 @@ void MasterSystem::RenderGame()
         {
             m_Width = width;
             m_Height = height;
-            SDL_SetVideoMode(m_Width, m_Height, 8, SDL_OPENGL);
+            SDL_SetWindowSize(window, m_Width, m_Height);
         }
 
-        glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+        glClear(GL_COLOR_BUFFER_BIT);
         glLoadIdentity();
         glRasterPos2i(-1, 1);
         glPixelZoom(1, -1);
@@ -228,7 +245,7 @@ void MasterSystem::RenderGame()
             glDrawPixels(m_Width, m_Height, GL_RGB, GL_UNSIGNED_BYTE, m_Emulator->GetGraphicChip().m_ScreenHigh);
         }
         
-        SDL_GL_SwapBuffers();
+        SDL_GL_SwapWindow(window);
     }
 }
 
@@ -241,7 +258,7 @@ unsigned char MasterSystem::GetMemoryByte(int i)
 
 /////////////////////////////////////////////////////////////////////////
 
-void MasterSystem::HandleInput(const SDL_Event& event)
+bool MasterSystem::HandleInput(const SDL_Event& event)
 {
     if(event.type == SDL_KEYDOWN)
     {
@@ -249,21 +266,23 @@ void MasterSystem::HandleInput(const SDL_Event& event)
         int player = 1;
         switch(event.key.keysym.sym)
         {
-            case SDLK_a : key = 4; break;
-            case SDLK_s : key = 5; break;
-            case SDLK_RIGHT : key = 3; break;
-            case SDLK_LEFT : key = 2; break;
-            case SDLK_UP : key = 0; break;
-            case SDLK_DOWN : key = 1; break;
-            case SDLK_BACKSPACE : m_Emulator->ResetButton(); break;
+        case SDLK_ESCAPE: return true;
 
-            case SDLK_KP4 : player = 2; key = 0; break; // left
-            case SDLK_KP6 : player = 2; key = 1; break; // right
-            case SDLK_KP7 : player = 2; key = 2; break; // fire a
-            case SDLK_KP9 : player = 2; key = 3; break; // fire b
-            case SDLK_KP8 : player = 1; key = 6; break; // up (although marked as player 1 it is player 2 but using overlapped ports)
-            case SDLK_KP2 : player = 1; key = 7; break; // down (although marked as player 1 it is player 2 but using overlapped ports)
-            default: break;
+        case SDLK_a: key = 4; break;
+        case SDLK_s: key = 5; break;
+        case SDLK_RIGHT: key = 3; break;
+        case SDLK_LEFT: key = 2; break;
+        case SDLK_UP: key = 0; break;
+        case SDLK_DOWN: key = 1; break;
+        case SDLK_BACKSPACE: m_Emulator->ResetButton(); break;
+
+        case SDLK_KP_4: player = 2; key = 0; break; // left
+        case SDLK_KP_6: player = 2; key = 1; break; // right
+        case SDLK_KP_7: player = 2; key = 2; break; // fire a
+        case SDLK_KP_9: player = 2; key = 3; break; // fire b
+        case SDLK_KP_8: player = 1; key = 6; break; // up (although marked as player 1 it is player 2 but using overlapped ports)
+        case SDLK_KP_2: player = 1; key = 7; break; // down (although marked as player 1 it is player 2 but using overlapped ports)
+        default: break;
         }
         if (key != -1)
         {
@@ -277,26 +296,28 @@ void MasterSystem::HandleInput(const SDL_Event& event)
         int player = 1;
         switch(event.key.keysym.sym)
         {
-            case SDLK_a : key = 4; break;
-            case SDLK_s : key = 5; break;
-            case SDLK_RIGHT : key = 3; break;
-            case SDLK_LEFT : key = 2; break;
-            case SDLK_UP : key = 0; break;
-            case SDLK_DOWN : key = 1; break;
+            case SDLK_a: key = 4; break;
+            case SDLK_s: key = 5; break;
+            case SDLK_RIGHT: key = 3; break;
+            case SDLK_LEFT: key = 2; break;
+            case SDLK_UP: key = 0; break;
+            case SDLK_DOWN: key = 1; break;
             case SDLK_BACKSPACE : key = 4; player = 2;break;
-            case SDLK_KP4 : player = 2; key = 0; break; // left
-            case SDLK_KP6 : player = 2; key = 1; break; // right
-            case SDLK_KP7 : player = 2; key = 2; break; // fire a
-            case SDLK_KP9 : player = 2; key = 3; break; // fire b
-            case SDLK_KP8 : player = 1; key = 6; break; // up (although marked as player 1 it is player 2 but using overlapped ports)
-            case SDLK_KP2 : player = 1; key = 7; break; // down (although marked as player 1 it is player 2 but using overlapped ports)
+            case SDLK_KP_4: player = 2; key = 0; break; // left
+            case SDLK_KP_6: player = 2; key = 1; break; // right
+            case SDLK_KP_7: player = 2; key = 2; break; // fire a
+            case SDLK_KP_9: player = 2; key = 3; break; // fire b
+            case SDLK_KP_8: player = 1; key = 6; break; // up (although marked as player 1 it is player 2 but using overlapped ports)
+            case SDLK_KP_2: player = 1; key = 7; break; // down (although marked as player 1 it is player 2 but using overlapped ports)
             default: break;
         }
+
         if (key != -1)
         {
             m_Emulator->SetKeyReleased(player,key);
         }
     }
+    return false;
 }
 
 /////////////////////////////////////////////////////////////////////////

@@ -32,9 +32,6 @@
 #include <cassert>
 #include <cstring>
 
-#include <SDL/SDL.h>
-#include <SDL/SDL_opengl.h>
-
 ///////////////////////////////////////////////////////////////////////////////////
 
 std::unique_ptr<Emulator> Emulator::m_Instance;
