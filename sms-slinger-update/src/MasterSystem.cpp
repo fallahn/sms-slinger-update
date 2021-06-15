@@ -57,9 +57,9 @@ MasterSystem* MasterSystem::CreateInstance()
 
 MasterSystem::MasterSystem()
     : m_Emulator(nullptr),
-    m_UseGFXOpt (false),
     m_Width     (0),
-    m_Height    (0)
+    m_Height    (0),
+    m_UseGFXOpt (false)
 {
     m_Emulator = Emulator::CreateInstance();
 }

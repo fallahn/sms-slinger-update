@@ -86,10 +86,10 @@ void LogMessage::DoLogMessage(const char* message, bool logToConsole)
 {
     if (m_LogFile != nullptr)
     {
-        long long size = ftell(m_LogFile);
+        long long size = ftell((FILE*)m_LogFile);
         if (size >= (30 * 1024 * 1024))
         {
-            fclose(m_LogFile);
+            fclose((FILE*)m_LogFile);
             Open();
         }
         fputs(message, (FILE*)m_LogFile);

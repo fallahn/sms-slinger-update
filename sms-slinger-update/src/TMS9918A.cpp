@@ -29,6 +29,7 @@
 
 #include <cassert>
 #include <cmath>
+#include <cstring>
 #include <fstream>
 
 bool TMS9918A::m_ScreenDisabled = true;
@@ -64,19 +65,27 @@ void GetOldStyleColour(BYTE colNum, BYTE& red, BYTE& green, BYTE& blue)
 /////////////////////////////////////////////////////////////////////////
 
 TMS9918A::TMS9918A()
-    : m_IsPAL               (true),
+    : m_RunningCycles       (0.f),
+    m_ClockInfo             (0),
+    m_IsPAL                 (true),
     m_NumScanlines          (NUM_NTSC_VERTICAL),
     m_IsVBlank              (false),
-    m_IsSecondControlWrite  (false),
     m_Status                (0),
+    m_ControlWord           (0),
+    m_TempWord              (0),
+    m_IsSecondControlWrite  (false),
     m_RequestInterupt       (false),
+    m_UseGFXOpt             (false),
+    m_VCounter              (0),
+    m_HCounter              (0),
+    m_VCounterFirst         (true),
+    m_LineInterupt          (0xFF),
     m_VScroll               (0),
     m_ReadBuffer            (0),
-    m_Width                 (NUM_RES_HORIZONTAL),
     m_Height                (NUM_RES_VERTICAL),
-    m_TempWord              (0),
+    m_Width                 (NUM_RES_HORIZONTAL),
     m_Refresh               (false),
-    m_UseGFXOpt             (false)
+    m_RefreshRatePerSecond  (0)
 {
     Reset(false);
 }
@@ -481,8 +490,8 @@ void TMS9918A::RenderSpritesMode2()
     WORD sgtable = m_VDPRegisters[0x6] & 7;
     sgtable <<= 11;
     
-    int size = IsRegBitSet(1,1)?16:8;
-    bool isZoomed = IsRegBitSet(1,0);
+    int size = IsRegBitSet(1, 1) ? 16 : 8;
+    //bool isZoomed = IsRegBitSet(1, 0);
 
     int spriteCount = 0;
 
@@ -609,7 +618,6 @@ void TMS9918A::RenderSpritesMode4()
     WORD satbase = GetSATBase();
 
     bool is8x16 = false;
-    bool isZoomed = false;
     int size = 8;      
 
     bool shiftX = IsRegBitSet(0,3);
@@ -624,7 +632,6 @@ void TMS9918A::RenderSpritesMode4()
 
     if (IsRegBitSet(1,0))
     {
-        isZoomed = true;
         size = 16;
     }
 
@@ -1306,8 +1313,8 @@ BYTE TMS9918A::GetHCounter() const
 void TMS9918A::DumpClockInfo()
 {
     char buffer[255];
-    std::memset(buffer,0,sizeof(buffer));
-    sprintf(buffer, "Graphics Chip Clock Cycles Per Second: %u There has beed %d frames", m_ClockInfo, m_RefreshRatePerSecond);
+    std::memset(buffer, 0, sizeof(buffer));
+    sprintf(buffer, "Graphics Chip Clock Cycles Per Second: %lu There has been %d frames", m_ClockInfo, m_RefreshRatePerSecond);
     LogMessage::GetSingleton()->DoLogMessage(buffer, true);
 
     m_ClockInfo = 0;

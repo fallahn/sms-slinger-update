@@ -123,13 +123,9 @@ void SN79489::OpenSDLAudioDevice()
 
 void SN79489::WriteData(unsigned long int cycles, BYTE data)
 {
-    bool updateLatch = false;
-
     // if bit 7 is set the it updates the latch
     if (TestBit(data, 7))
     {
-        updateLatch = true;
-
         // the channel is indentified by the 6 and 5 bits
         int channel = data;
         channel >>= 5;
@@ -342,7 +338,7 @@ void SN79489::DumpClockInfo()
 {
     char buffer[255];
     std::memset(buffer, 0, sizeof(buffer));
-    sprintf(buffer, "Sound Chip Clock Cycles Per Second: %u", m_ClockInfo);
+    sprintf(buffer, "Sound Chip Clock Cycles Per Second: %lu", m_ClockInfo);
     LogMessage::GetSingleton()->DoLogMessage(buffer, true);
 
     m_ClockInfo = 0;

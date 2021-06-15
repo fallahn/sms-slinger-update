@@ -28,6 +28,7 @@
 #include <SDL2/SDL.h>
 
 #include <vector>
+#include <cstdint>
 
 class SN79489
 {
