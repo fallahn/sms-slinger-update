@@ -178,7 +178,7 @@ void MasterSystem::RomLoop(int fps)
 
     while (!quit)
     {
-        while (SDL_PollEvent(&event))
+        while(SDL_PollEvent(&event)) 
         {
             if (event.type == SDL_QUIT
                 || HandleInput(event))
@@ -286,7 +286,7 @@ bool MasterSystem::HandleInput(const SDL_Event& event)
         }
         if (key != -1)
         {
-            m_Emulator->SetKeyPressed(player,key);
+            m_Emulator->SetKeyPressed(player, key);
         }
     }
     //If a key was released
@@ -296,25 +296,25 @@ bool MasterSystem::HandleInput(const SDL_Event& event)
         int player = 1;
         switch(event.key.keysym.sym)
         {
-            case SDLK_a: key = 4; break;
-            case SDLK_s: key = 5; break;
-            case SDLK_RIGHT: key = 3; break;
-            case SDLK_LEFT: key = 2; break;
-            case SDLK_UP: key = 0; break;
-            case SDLK_DOWN: key = 1; break;
-            case SDLK_BACKSPACE : key = 4; player = 2;break;
-            case SDLK_KP_4: player = 2; key = 0; break; // left
-            case SDLK_KP_6: player = 2; key = 1; break; // right
-            case SDLK_KP_7: player = 2; key = 2; break; // fire a
-            case SDLK_KP_9: player = 2; key = 3; break; // fire b
-            case SDLK_KP_8: player = 1; key = 6; break; // up (although marked as player 1 it is player 2 but using overlapped ports)
-            case SDLK_KP_2: player = 1; key = 7; break; // down (although marked as player 1 it is player 2 but using overlapped ports)
-            default: break;
+        case SDLK_a: key = 4; break;
+        case SDLK_s: key = 5; break;
+        case SDLK_RIGHT: key = 3; break;
+        case SDLK_LEFT: key = 2; break;
+        case SDLK_UP: key = 0; break;
+        case SDLK_DOWN: key = 1; break;
+        case SDLK_BACKSPACE : key = 4; player = 2;break;
+        case SDLK_KP_4: player = 2; key = 0; break; // left
+        case SDLK_KP_6: player = 2; key = 1; break; // right
+        case SDLK_KP_7: player = 2; key = 2; break; // fire a
+        case SDLK_KP_9: player = 2; key = 3; break; // fire b
+        case SDLK_KP_8: player = 1; key = 6; break; // up (although marked as player 1 it is player 2 but using overlapped ports)
+        case SDLK_KP_2: player = 1; key = 7; break; // down (although marked as player 1 it is player 2 but using overlapped ports)
+        default: break;
         }
 
         if (key != -1)
         {
-            m_Emulator->SetKeyReleased(player,key);
+            m_Emulator->SetKeyReleased(player, key);
         }
     }
     return false;

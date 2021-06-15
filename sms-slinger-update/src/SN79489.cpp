@@ -30,11 +30,13 @@
 
 #include <cmath>
 #include <cstring>
+#include <iostream>
 
 ////////////////////////////////////////////////////////////////////
 
 SN79489::SN79489()
-    : m_LatchedChannel  (CHANNEL::CHANNEL_ZERO),
+    : m_Buffer          (BUFFERSIZE),
+    m_LatchedChannel    (CHANNEL::CHANNEL_ZERO),
     m_IsToneLatched     (false),
     m_CurrentBufferPos  (0),
     m_Cycles            (0.f),
@@ -50,7 +52,7 @@ SN79489::SN79489()
 
     for (int i = 0; i < 15; ++i)
     {
-        m_VolumeTable[i] = (int)vol;
+        m_VolumeTable[i] = static_cast<int>(vol);
         vol *= TwodBScalingFactor;
     }
 
@@ -80,7 +82,8 @@ SN79489::SN79489()
 void SN79489::Reset()
 {
     m_BufferUpdateCount = 0;
-    std::memset(m_Buffer, 0, sizeof(m_Buffer));
+    std::fill(m_Buffer.begin(), m_Buffer.end(), 0);
+    //std::memset(m_Buffer, 0, sizeof(m_Buffer));
     std::memset(m_Tones, 0, sizeof(m_Tones));
     std::memset(m_Counters, 0, sizeof(m_Counters));
     m_ClockInfo = 0;
@@ -108,7 +111,7 @@ void SN79489::OpenSDLAudioDevice()
     as.format = AUDIO_S16SYS;
     as.channels = 1;
     as.silence = 0;
-    as.samples = BUFFERSIZE;
+    as.samples = BUFFERSIZE / 4;
     as.size = 0;
     as.callback = HandleSDLCallback;
     as.userdata = this;
@@ -123,7 +126,7 @@ void SN79489::WriteData(unsigned long int cycles, BYTE data)
     bool updateLatch = false;
 
     // if bit 7 is set the it updates the latch
-    if (TestBit(data,7))
+    if (TestBit(data, 7))
     {
         updateLatch = true;
 
@@ -133,10 +136,10 @@ void SN79489::WriteData(unsigned long int cycles, BYTE data)
 
         // turn off top bit
         channel &= 0x3;
-        m_LatchedChannel = (CHANNEL)channel;
+        m_LatchedChannel = static_cast<CHANNEL>(channel);
 
         // if bit 4 is set then the channel we're latching volume, otherwise tone
-        m_IsToneLatched = TestBit(data,4)?false:true;
+        m_IsToneLatched = TestBit(data, 4) ? false : true;
         
         // bottom 4 bits are the data to be updated
         BYTE channelData = data & 0xF;
@@ -183,13 +186,13 @@ void SN79489::WriteData(unsigned long int cycles, BYTE data)
         WORD channelData = 0;
 
         // the data to update with is the bottom 6 bits of the data being passed in
-        channelData = data & 0x3F;
+        channelData = (data & 0x3F);
 
         if (m_IsToneLatched)
         {
             if (m_LatchedChannel == TONES_NOISE)
             {
-                m_Tones[TONES_NOISE] = data & 0xF;
+                m_Tones[TONES_NOISE] = (data & 0xF);
                 m_LFSR = 0x8000;
             }
             else
@@ -216,7 +219,7 @@ void SN79489::WriteData(unsigned long int cycles, BYTE data)
 
 void SN79489::HandleSDLCallback(void* userData, Uint8* buffer, int len)
 {
-    SN79489* data = (SN79489*)userData;
+    SN79489* data = static_cast<SN79489*>(userData);
     data->HandleSDLCallback(buffer, len);
 }
 
@@ -224,8 +227,15 @@ void SN79489::HandleSDLCallback(void* userData, Uint8* buffer, int len)
 
 void SN79489::HandleSDLCallback(Uint8* buffer, int len)
 {
-    memcpy(buffer, m_Buffer, len);
-    //memset(m_Buffer,0,sizeof(m_Buffer));
+    static int lastLen = 0;
+
+    if (len > lastLen)
+    {
+        lastLen = len;
+        std::cout << "buffer requested " << len << std::endl;
+    }
+
+    std::memcpy(buffer, m_Buffer.data(), len);
     m_CurrentBufferPos = 0;
 }
 
@@ -233,9 +243,11 @@ void SN79489::HandleSDLCallback(Uint8* buffer, int len)
 
 int parity (BYTE data)
 {
-    int bitCount = BitCount(data,4);
+    int bitCount = BitCount(data, 4);
     if ((bitCount % 2) == 0)
+    {
         return 0;
+    }
     return 1;
 }
 
@@ -248,7 +260,7 @@ void SN79489::Update(float cyclesMac)
 
     m_Cycles += cyclesMac;
 
-    float floor = floorf(m_Cycles);
+    float floor = std::floor(m_Cycles);
     m_ClockInfo += static_cast<unsigned long>(floor);
 
     m_Cycles -= floor; 
@@ -301,11 +313,11 @@ void SN79489::Update(float cyclesMac)
             // if the polarity changed from -1 to 1 then shift the random number
             if (m_Polarity[TONES_NOISE] == 1)
             {
-                bool isWhiteNoise = TestBit(m_Tones[TONES_NOISE],2);
+                bool isWhiteNoise = TestBit(m_Tones[TONES_NOISE], 2);
                 BYTE tappedBits = BitGetVal(m_Tones[TONES_NOISE], 0);
                 tappedBits |= (BitGetVal(m_Tones[TONES_NOISE], 3) << 3);
                 
-                m_LFSR =(m_LFSR>>1) | ((isWhiteNoise?parity(m_LFSR&tappedBits):m_LFSR&1)<<15);
+                m_LFSR = (m_LFSR>>1) | ((isWhiteNoise ? parity(m_LFSR & tappedBits) : (m_LFSR & 1)) << 15);
             }
         }
 
@@ -329,7 +341,7 @@ void SN79489::Update(float cyclesMac)
 void SN79489::DumpClockInfo()
 {
     char buffer[255];
-    memset(buffer,0,sizeof(buffer));
+    std::memset(buffer, 0, sizeof(buffer));
     sprintf(buffer, "Sound Chip Clock Cycles Per Second: %u", m_ClockInfo);
     LogMessage::GetSingleton()->DoLogMessage(buffer, true);
 

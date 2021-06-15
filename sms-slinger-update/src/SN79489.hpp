@@ -27,6 +27,8 @@
 
 #include <SDL2/SDL.h>
 
+#include <vector>
+
 class SN79489
 {
 public:
@@ -69,9 +71,9 @@ private:
             void                HandleSDLCallback(Uint8* buffer, int len);
             void                OpenSDLAudioDevice();
 
-    static  constexpr unsigned int  BUFFERSIZE = 1024;
+            static  constexpr unsigned int  BUFFERSIZE = 8096;
     static  constexpr int           FREQUENCY = 44100;
-            signed short int    m_Buffer[BUFFERSIZE];
+            std::vector<std::int16_t>    m_Buffer;
             WORD                m_Tones[TONES_NUM];
             BYTE                m_Volume[VOLUME_NUM];
             int                 m_Counters[CHANNEL_NUM];
