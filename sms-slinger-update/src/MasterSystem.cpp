@@ -66,6 +66,12 @@ namespace
         count++;
         return res;
     }
+
+    void audioCallback(void* userData, Uint8* buffer, int len)
+    {
+        SN79489* data = static_cast<SN79489*>(userData);
+        data->audioCallback(buffer, len);
+    }
 }
 
 std::unique_ptr<MasterSystem> MasterSystem::m_instance;
@@ -116,13 +122,22 @@ bool MasterSystem::createSDLWindow()
     }
 
     initGL();
+    initAudio();
     return true;
 }
 
 void MasterSystem::startRom(const char* path)
 {
+    //TODO this may not be enough to only pause
+    //the callback as it runs in its own thread
+    //and can be called mid-reset... instead we
+    //may have to close then re-open the device
+    SDL_PauseAudio(1);
+
     m_emulator->reset();
     m_emulator->insertCartridge(path);
+
+    SDL_PauseAudio(0);
 }
 
 void MasterSystem::beginGame(int fps, bool useGFXOpt)
@@ -153,6 +168,20 @@ void MasterSystem::initGL()
     glDisable(GL_CULL_FACE);
     glDisable(GL_DITHER);
     glDisable(GL_BLEND);
+}
+
+void MasterSystem::initAudio()
+{
+    SDL_AudioSpec as;
+    as.freq = SN79489::FREQUENCY;
+    as.format = AUDIO_S16SYS;
+    as.channels = 1;
+    as.silence = 0;
+    as.samples = SN79489::BUFFERSIZE / 4;
+    as.size = 0;
+    as.callback = audioCallback;
+    as.userdata = &m_emulator->getSoundChip();
+    SDL_OpenAudio(&as, 0);
 }
 
 void MasterSystem::renderGame()

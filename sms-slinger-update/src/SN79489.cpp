@@ -34,9 +34,6 @@
 
 namespace
 {
-    constexpr unsigned int BUFFERSIZE = 8096;
-    constexpr int FREQUENCY = 44100;
-
     int parity(BYTE data)
     {
         int count = bitCount(data, 4);
@@ -74,7 +71,6 @@ SN79489::SN79489()
     m_volumeTable[15] = 0;
 
     reset();
-    SDL_PauseAudio(1);
 
     // strange calculation works out how many sound clock cycles is needed before we need to
     // add a new element to the playback buffer.
@@ -200,8 +196,6 @@ void SN79489::reset()
     m_currentBufferPos = 0;
     m_cycles = 0;
     m_LFSR = 0x8000;
-    SDL_CloseAudio();
-    openSDLAudioDevice();
 }
 
 void SN79489::update(float cyclesMac)
@@ -287,24 +281,7 @@ void SN79489::update(float cyclesMac)
     }       
 }
 
-void SN79489::dumpClockInfo()
-{
-    char buffer[255];
-    std::memset(buffer, 0, sizeof(buffer));
-    sprintf(buffer, "Sound Chip Clock Cycles Per Second: %lu", m_clockInfo);
-    LogMessage::GetSingleton()->DoLogMessage(buffer, true);
-
-    m_clockInfo = 0;
-}
-
-//private
-void SN79489::handleSDLCallback(void* userData, Uint8* buffer, int len)
-{
-    SN79489* data = static_cast<SN79489*>(userData);
-    data->handleSDLCallback(buffer, len);
-}
-
-void SN79489::handleSDLCallback(Uint8* buffer, int len)
+void SN79489::audioCallback(std::uint8_t* buffer, std::int32_t len)
 {
     static int lastLen = 0;
 
@@ -318,17 +295,14 @@ void SN79489::handleSDLCallback(Uint8* buffer, int len)
     m_currentBufferPos = 0;
 }
 
-void SN79489::openSDLAudioDevice()
+void SN79489::dumpClockInfo()
 {
-    SDL_AudioSpec as;
-    as.freq = FREQUENCY;
-    as.format = AUDIO_S16SYS;
-    as.channels = 1;
-    as.silence = 0;
-    as.samples = BUFFERSIZE / 4;
-    as.size = 0;
-    as.callback = handleSDLCallback;
-    as.userdata = this;
-    SDL_OpenAudio(&as, 0);
-    SDL_PauseAudio(0);
+    char buffer[255];
+    std::memset(buffer, 0, sizeof(buffer));
+    sprintf(buffer, "Sound Chip Clock Cycles Per Second: %lu", m_clockInfo);
+    LogMessage::GetSingleton()->DoLogMessage(buffer, true);
+
+    m_clockInfo = 0;
 }
+
+//private

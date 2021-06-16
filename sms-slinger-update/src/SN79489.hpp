@@ -25,8 +25,6 @@
 
 #pragma once
 
-#include <SDL2/SDL.h>
-
 #include <vector>
 #include <array>
 #include <cstdint>
@@ -34,11 +32,15 @@
 class SN79489 final
 {
 public:
+    static constexpr unsigned int BUFFERSIZE = 8096;
+    static constexpr int FREQUENCY = 44100;
+
     SN79489();
 
     void writeData(unsigned long int cycles, BYTE data);
     void reset();
     void update(float cycles);
+    void audioCallback(std::uint8_t*, std::int32_t);
     void dumpClockInfo();
 
 private:
@@ -98,8 +100,4 @@ private:
     unsigned long int m_clockInfo;
     float m_bufferUpdateCount;
     float m_updateBufferLimit;
-
-    static void handleSDLCallback(void* userData, Uint8* buffer, int len);
-    void handleSDLCallback(Uint8* buffer, int len);
-    void openSDLAudioDevice();
 };

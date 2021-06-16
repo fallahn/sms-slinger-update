@@ -27,7 +27,7 @@
 
 #include <array>
 
-class TMS9918A
+class TMS9918A final
 {
 public:
     static constexpr int NUM_RES_HORIZONTAL = 256;

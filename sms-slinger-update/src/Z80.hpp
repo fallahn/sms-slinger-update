@@ -84,7 +84,7 @@ struct CONTEXTZ80
     bool                m_NMIServicing;
 };
 
-class Z80
+class Z80 final
 {
 public:
                         Z80();

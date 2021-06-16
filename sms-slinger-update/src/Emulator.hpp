@@ -49,6 +49,7 @@ public:
     BYTE readIOMemory(const BYTE& address);
     void writeIOMemory(const BYTE& address, const BYTE& data);
     TMS9918A& getGraphicChip() { return m_graphicsChip; }
+    SN79489& getSoundChip() { return m_soundChip; }
 
     void setKeyPressed(int player, int key);
     void setKeyReleased(int player, int key);

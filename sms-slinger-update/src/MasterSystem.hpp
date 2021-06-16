@@ -52,6 +52,7 @@ private:
     bool m_useGFXOpt;
 
     void initGL();
+    void initAudio();
     void renderGame();
     void romLoop(int fps);
     bool handleInput(const SDL_Event& event);
