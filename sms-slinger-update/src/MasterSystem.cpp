@@ -38,6 +38,7 @@ namespace
 
     SDL_Window* window = nullptr;
     SDL_GLContext ctx = nullptr;
+    SDL_AudioDeviceID audioDevice = 0;
 
     //TODO replace this with ImGui
     unsigned int fpstime = 0;
@@ -128,16 +129,12 @@ bool MasterSystem::createSDLWindow()
 
 void MasterSystem::startRom(const char* path)
 {
-    //TODO this may not be enough to only pause
-    //the callback as it runs in its own thread
-    //and can be called mid-reset... instead we
-    //may have to close then re-open the device
-    SDL_PauseAudio(1);
+    SDL_PauseAudioDevice(audioDevice, 1);
 
     m_emulator->reset();
     m_emulator->insertCartridge(path);
 
-    SDL_PauseAudio(0);
+    SDL_PauseAudioDevice(audioDevice, 0);
 }
 
 void MasterSystem::beginGame(int fps, bool useGFXOpt)
@@ -177,11 +174,12 @@ void MasterSystem::initAudio()
     as.format = AUDIO_S16SYS;
     as.channels = 1;
     as.silence = 0;
-    as.samples = SN79489::BUFFERSIZE / 4;
+    as.samples = SN79489::BUFFERSIZE;
     as.size = 0;
-    as.callback = audioCallback;
-    as.userdata = &m_emulator->getSoundChip();
-    SDL_OpenAudio(&as, 0);
+    //as.callback = audioCallback;
+    //as.userdata = &m_emulator->getSoundChip();
+
+    audioDevice = SDL_OpenAudioDevice(nullptr, 0, &as, nullptr, 0);
 }
 
 void MasterSystem::renderGame()
@@ -259,8 +257,13 @@ void MasterSystem::romLoop(int fps)
         {
             m_emulator->update();
             renderGame();
+
             LogFrameRate();
         }
+
+        auto [data, size] = m_emulator->getSoundChip().getSamples();
+        SDL_QueueAudio(audioDevice, data, size);
+
     }
 
     SDL_GL_DeleteContext(ctx);

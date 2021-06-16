@@ -56,7 +56,7 @@ SN79489::SN79489()
     m_bufferUpdateCount (0.f),
     m_updateBufferLimit (0.f)
 {
-    constexpr int maxVolume = 8000; // there are 4 channels and the output is a signed 16 bit num giving a range of -32,000 + 32,000 so 4 * 8000 fits into the range
+    constexpr int maxVolume = 4000; // there are 4 channels and the output is a signed 16 bit num giving a range of -32,000 + 32,000 so 4 * 8000 fits into the range
     constexpr double TwodBScalingFactor = 0.79432823; // each volume setting gets lower by 2 decibels
 
     double vol = maxVolume;
@@ -75,14 +75,14 @@ SN79489::SN79489()
     // strange calculation works out how many sound clock cycles is needed before we need to
     // add a new element to the playback buffer.
 
-    // the amount of times that sdl will request the buffer to be filled up in a second
-    constexpr float sdlCallbakFreq = (FREQUENCY / BUFFERSIZE) + 1;
+    // the amount of times that callback should request the buffer to be filled up in a second
+    constexpr float callbackFreq = (FREQUENCY / BUFFERSIZE) + 1;
 
     // the clockSpeed of the sound chip is 3.3Mhz / 16
     constexpr float clockSpeed = 220000.f;
 
 
-    float updateBufferLimit = clockSpeed / sdlCallbakFreq;
+    float updateBufferLimit = clockSpeed / callbackFreq;
     updateBufferLimit /= BUFFERSIZE; 
     m_updateBufferLimit = updateBufferLimit;
 }
@@ -276,23 +276,29 @@ void SN79489::update(float cyclesMac)
             m_buffer[m_currentBufferPos] = tone;
         }
             
-        m_currentBufferPos++;
+        //m_currentBufferPos++;
+        m_currentBufferPos = (m_currentBufferPos + 1) % BUFFERSIZE;
         m_bufferUpdateCount = m_updateBufferLimit - m_bufferUpdateCount;       
     }       
 }
 
 void SN79489::audioCallback(std::uint8_t* buffer, std::int32_t len)
 {
-    static int lastLen = 0;
-
-    if (len > lastLen)
-    {
-        lastLen = len;
-        std::cout << "buffer requested " << len << std::endl;
-    }
-
     std::memcpy(buffer, m_buffer.data(), len);
     m_currentBufferPos = 0;
+}
+
+SN79489::SampleBuffer SN79489::getSamples() const
+{
+    SampleBuffer buf;
+    buf.data = m_buffer.data();
+    buf.size = m_currentBufferPos * sizeof(std::int16_t);
+
+    //this assumes all the data has been consumed by the caller
+    //so we start writing from the beginning again
+    m_currentBufferPos = 0;
+
+    return buf;
 }
 
 void SN79489::dumpClockInfo()

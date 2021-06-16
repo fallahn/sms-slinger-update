@@ -31,7 +31,7 @@ int main (int argsc, char** argsv)
     sms->createSDLWindow();
     //sms->startRom("roms/lander2_v0C.sms");
     sms->startRom("roms/cb01f.sms");
-    sms->beginGame(60);
+    sms->beginGame(120);
     
     return 0;
 }

@@ -40,7 +40,8 @@ public:
 
     bool createSDLWindow();
     void startRom(const char* path);
-    void beginGame(int fps, bool useGfxOpt = false);
+    //-1 for no sync, else attempts to sync to given frame rate
+    void beginGame(int fps = -1, bool useGfxOpt = false);
     unsigned char getMemoryByte(int i);
 
 private:

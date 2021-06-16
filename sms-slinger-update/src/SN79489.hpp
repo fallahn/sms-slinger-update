@@ -32,7 +32,7 @@
 class SN79489 final
 {
 public:
-    static constexpr unsigned int BUFFERSIZE = 8096;
+    static constexpr unsigned int BUFFERSIZE = 4096;
     static constexpr int FREQUENCY = 44100;
 
     SN79489();
@@ -42,6 +42,13 @@ public:
     void update(float cycles);
     void audioCallback(std::uint8_t*, std::int32_t);
     void dumpClockInfo();
+
+    struct SampleBuffer final
+    {
+        const void* data = nullptr;
+        std::uint32_t size = 0;
+    };
+    SampleBuffer getSamples() const;
 
 private:
 
@@ -94,7 +101,7 @@ private:
 
     int m_latchedChannel;
     bool m_isToneLatched;
-    int m_currentBufferPos;
+    mutable int m_currentBufferPos;
     float m_cycles;
     WORD m_LFSR;
     unsigned long int m_clockInfo;
