@@ -25,101 +25,101 @@
 
 #pragma once
 
+#include <array>
+
 class TMS9918A
 {
 public:
-    static constexpr    int         NUM_RES_HORIZONTAL = 256;
-    static constexpr    int         NUM_RES_VERTICAL = 192;
-    static constexpr    int         NUM_NTSC_VERTICAL = 262;
-    static constexpr    int         NUM_PAL_VERTICAL = 313;
-    static constexpr    int         NUM_RES_VERT_MED = 224;
-    static constexpr    int         NUM_RES_VERT_HIGH = 240;
-    static constexpr    int         SCREENBLANKCOLOUR = 1;
+    static constexpr int NUM_RES_HORIZONTAL = 256;
+    static constexpr int NUM_RES_VERTICAL = 192;
+    static constexpr int NUM_NTSC_VERTICAL = 262;
+    static constexpr int NUM_PAL_VERTICAL = 313;
+    static constexpr int NUM_RES_VERT_MED = 224;
+    static constexpr int NUM_RES_VERT_HIGH = 240;
+    static constexpr int SCREENBLANKCOLOUR = 1;
 
-    static constexpr    int         MACHINE_CLICKS_PER_SCANLINE = 684;
+    static constexpr int MACHINE_CLICKS_PER_SCANLINE = 684;
 
-                                TMS9918A();
+    TMS9918A();
 
-                    void        Update(float cycles);
-                    void        Reset(bool isPAL);
-                    BYTE        ReadMemory(BYTE address);
-                    void        WriteMemory(BYTE address, BYTE data);
-                    void        WriteVDPAddress(BYTE data);
-                    BYTE        ReadDataPort();
-                    void        WriteDataPort(BYTE data);
-                    BYTE        GetStatus();
-                    void        ResetScreen();
-                    BYTE        GetHCounter() const;
-                    BYTE        GetVCounter() const { return m_VCounter; }
-                    bool        IsRequestingInterupt() const { return m_RequestInterupt; }
-                    WORD        GetHeight() const { return m_Height; }
-                    WORD        GetWidth() const { return m_Width; }
-                    bool        GetRefresh();
-                    void        DumpClockInfo();
-                    void        SetGFXOpt(bool useGFXOpt) { m_UseGFXOpt = useGFXOpt; }
+    void update(float cycles);
+    void reset(bool isPAL);
+    BYTE readMemory(BYTE address);
+    void writeMemory(BYTE address, BYTE data);
+    void writeVDPAddress(BYTE data);
+    BYTE readDataPort();
+    void writeDataPort(BYTE data);
+    BYTE getStatus();
+    void resetScreen();
+    BYTE getHCounter() const;
+    BYTE getVCounter() const { return m_VCounter; }
+    bool isRequestingInterupt() const { return m_requestInterrupt; }
+    WORD getWidth() const { return m_width; }
+    WORD getHeight() const { return m_height; }
+    bool getRefresh();
+    void dumpClockInfo();
+    void setGFXOpt(bool useGFXOpt) { m_useGFXOpt = useGFXOpt; }
                     
-                    BYTE        m_ScreenStandard[NUM_RES_VERTICAL][NUM_RES_HORIZONTAL][3];
-                    BYTE        m_ScreenMed[NUM_RES_VERT_MED][NUM_RES_HORIZONTAL][3];
-                    BYTE        m_ScreenHigh[NUM_RES_VERT_HIGH][NUM_RES_HORIZONTAL][3];
+    BYTE screenStandard[NUM_RES_VERTICAL][NUM_RES_HORIZONTAL][3];
+    BYTE screenMed[NUM_RES_VERT_MED][NUM_RES_HORIZONTAL][3];
+    BYTE screenHigh[NUM_RES_VERT_HIGH][NUM_RES_HORIZONTAL][3];
 
-    static          bool        m_ScreenDisabled;
-    static          bool        m_FrameToggle;
+    static bool screenDisabled;
+    static bool frameToggle;
+
 private:
+    std::array<BYTE, 0x4000> m_VRAM = {};
+    std::array<BYTE, 32> m_CRAM = {};
+    std::array<BYTE, 16> m_VDPRegisters = {};
 
+    float m_runningCycles;
+    unsigned int long m_clockInfo;
+    bool m_isPAL;
+    int m_numScanlines;
+    bool m_isVBlank;
+    BYTE m_status;
+    WORD m_controlWord;
+    WORD m_tempWord;
+//  WORD m_newControlWord;
+    bool m_isSecondControlWrite;
+    bool m_requestInterrupt;
+    bool m_useGFXOpt;
+
+    BYTE m_VCounter;
+    WORD m_HCounter;
+    bool m_VCounterFirst;
+    BYTE m_lineInterrupt;
+    BYTE m_VScroll;
+    BYTE m_readBuffer;
+    WORD m_width;
+    WORD m_height;
+    bool m_refresh;
+    int m_refreshRatePerSecond;
     
 
-                    WORD        GetAddressRegister() const;
-                    BYTE        GetCodeRegister() const;
-                    void        IncrementAddress();
-                    void        SetRegData();
-                    void        Render();
-                    void        RenderOpt();
-                    void        RenderSpritesMode2();
-                    void        RenderSpritesMode4();
-                    void        RenderBackgroundMode2();
-                    void        RenderBackgroundMode4();
-                    bool        IsRegBitSet(int reg, BYTE bit);
-                    void        SetSpriteOverflow();
-                    void        SetSpriteCollision();
-                    WORD        GetSATBase() const;
-                    WORD        GetNameBase() const;
-            inline  BYTE        GetColourShade(BYTE val) const;
+    WORD getAddressRegister() const;
+    BYTE getCodeRegister() const;
+    void incrementAddress();
+    void setRegData();
+    void render();
+    void renderOpt();
+    void renderSpritesMode2();
+    void renderSpritesMode4();
+    void renderBackgroundMode2();
+    void renderBackgroundMode4();
+    bool isRegBitSet(int reg, BYTE bit);
+    void setSpriteOverflow();
+    void setSpriteCollision();
+    WORD getSATBase() const;
+    WORD getNameBase() const;
+    inline BYTE getColourShade(BYTE val) const;
 
-                    BYTE        GetVDPMode() const;
-            inline  void        WriteToScreen(BYTE x, BYTE y, BYTE red, BYTE blue, BYTE green);
-            inline  BYTE        GetScreenPixelColour(BYTE x, BYTE y, int index ) const;
-                    BYTE        GetVJump() const;
-                    BYTE        GetVJumpTo() const;
-                    void        DumpVRAM();
-                    void        DrawMode2Sprite(const WORD& address, BYTE xpos, BYTE line, BYTE colour);
-                    void        SetMode2IllegalSprites(BYTE sprite);
-                    
-                    float       m_RunningCycles;
-                    unsigned int long m_ClockInfo;
-
-
-                    BYTE        m_VRAM[0x4000];
-                    BYTE        m_CRAM[32];
-                    bool        m_IsPAL;
-                    int         m_NumScanlines;
-                    bool        m_IsVBlank;
-                    BYTE        m_Status;
-                    WORD        m_ControlWord;
-                    WORD        m_TempWord;
-                //  WORD        m_NewControlWord ;
-                    bool        m_IsSecondControlWrite;
-                    BYTE        m_VDPRegisters[16];
-                    bool        m_RequestInterupt;
-                    bool        m_UseGFXOpt;
-
-                    BYTE        m_VCounter;
-                    WORD        m_HCounter;
-                    bool        m_VCounterFirst;
-                    BYTE        m_LineInterupt;
-                    BYTE        m_VScroll;
-                    BYTE        m_ReadBuffer;
-                    WORD        m_Height;
-                    WORD        m_Width;
-                    bool        m_Refresh;
-                    int         m_RefreshRatePerSecond;        
+    BYTE getVDPMode() const;
+    inline void writeToScreen(BYTE x, BYTE y, BYTE red, BYTE blue, BYTE green);
+    inline BYTE getScreenPixelColour(BYTE x, BYTE y, int index ) const;
+    BYTE getVJump() const;
+    BYTE getVJumpTo() const;
+    void dumpVRAM();
+    void drawMode2Sprite(const WORD& address, BYTE xpos, BYTE line, BYTE colour);
+    void setMode2IllegalSprites(BYTE sprite);   
 };

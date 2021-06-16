@@ -157,10 +157,10 @@ void MasterSystem::initGL()
 
 void MasterSystem::renderGame()
 {
-    if (TMS9918A::m_FrameToggle && !TMS9918A::m_ScreenDisabled)
+    if (TMS9918A::frameToggle && !TMS9918A::screenDisabled)
     {
-        int width = SCREENSCALE * m_emulator->getGraphicChip().GetWidth();
-        int height = SCREENSCALE * m_emulator->getGraphicChip().GetHeight();
+        int width = SCREENSCALE * m_emulator->getGraphicChip().getWidth();
+        int height = SCREENSCALE * m_emulator->getGraphicChip().getHeight();
 
         if (width != m_width || height != m_height)
         {
@@ -175,15 +175,15 @@ void MasterSystem::renderGame()
         glPixelZoom(1, -1);
         if (height == SCREENSCALE * TMS9918A::NUM_RES_VERTICAL)
         {
-            glDrawPixels(m_width, m_height, GL_RGB, GL_UNSIGNED_BYTE, m_emulator->getGraphicChip().m_ScreenStandard);
+            glDrawPixels(m_width, m_height, GL_RGB, GL_UNSIGNED_BYTE, m_emulator->getGraphicChip().screenStandard);
         }
         else if (height == SCREENSCALE * TMS9918A::NUM_RES_VERT_MED)
         {
-            glDrawPixels(m_width, m_height, GL_RGB, GL_UNSIGNED_BYTE, m_emulator->getGraphicChip().m_ScreenMed);
+            glDrawPixels(m_width, m_height, GL_RGB, GL_UNSIGNED_BYTE, m_emulator->getGraphicChip().screenMed);
         }
         else if (height == SCREENSCALE * TMS9918A::NUM_RES_VERT_HIGH)
         {
-            glDrawPixels(m_width, m_height, GL_RGB, GL_UNSIGNED_BYTE, m_emulator->getGraphicChip().m_ScreenHigh);
+            glDrawPixels(m_width, m_height, GL_RGB, GL_UNSIGNED_BYTE, m_emulator->getGraphicChip().screenHigh);
         }
 
         SDL_GL_SwapWindow(window);

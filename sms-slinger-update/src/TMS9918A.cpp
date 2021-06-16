@@ -32,117 +32,77 @@
 #include <cstring>
 #include <fstream>
 
-bool TMS9918A::m_ScreenDisabled = true;
-bool TMS9918A::m_FrameToggle = true;
-
-/////////////////////////////////////////////////////////////////////////
-
-void GetOldStyleColour(BYTE colNum, BYTE& red, BYTE& green, BYTE& blue)
+namespace
 {
-    switch (colNum)
+    void GetOldStyleColour(BYTE colNum, BYTE& red, BYTE& green, BYTE& blue)
     {
-    case 0: red = 0; green = 0; blue = 0; break; // transparent
-    case 1: red = 0; green = 0; blue = 0; break; // black
-    case 2: red = 33; green = 200; blue = 66; break; // medium green
-    case 3: red = 94; green = 220; blue = 120; break; // light green
-    case 4: red = 84; green = 85; blue = 237; break; // dark blue
-    case 5: red = 125; green = 118; blue = 252; break; // light blue
-    case 6: red = 212; green = 82; blue = 77; break; // dark red
-    case 7: red = 66; green = 235; blue = 245; break; // cyan
-    case 8: red = 252; green = 85; blue = 84; break; // medium red
-    case 9: red = 255; green = 121; blue = 120; break; // light red
-    case 0xA: red = 212; green = 193; blue = 84; break; // dark yellow
-    case 0xB: red = 230; green = 206; blue = 84; break; // light yellow
-    case 0xC: red = 33; green = 176; blue = 59; break; // dark green
-    case 0xD: red = 201; green = 91; blue = 186; break; // Magenta
-    case 0xE: red = 204; green = 204; blue = 204; break; // Gray
-    case 0xF: red = 255; green = 255; blue = 255; break; // White
-    default: LogMessage::GetSingleton()->DoLogMessage("Invalid mode 2 colour", true); assert(false); break;
+        switch (colNum)
+        {
+        case 0: red = 0; green = 0; blue = 0; break; // transparent
+        case 1: red = 0; green = 0; blue = 0; break; // black
+        case 2: red = 33; green = 200; blue = 66; break; // medium green
+        case 3: red = 94; green = 220; blue = 120; break; // light green
+        case 4: red = 84; green = 85; blue = 237; break; // dark blue
+        case 5: red = 125; green = 118; blue = 252; break; // light blue
+        case 6: red = 212; green = 82; blue = 77; break; // dark red
+        case 7: red = 66; green = 235; blue = 245; break; // cyan
+        case 8: red = 252; green = 85; blue = 84; break; // medium red
+        case 9: red = 255; green = 121; blue = 120; break; // light red
+        case 0xA: red = 212; green = 193; blue = 84; break; // dark yellow
+        case 0xB: red = 230; green = 206; blue = 84; break; // light yellow
+        case 0xC: red = 33; green = 176; blue = 59; break; // dark green
+        case 0xD: red = 201; green = 91; blue = 186; break; // Magenta
+        case 0xE: red = 204; green = 204; blue = 204; break; // Gray
+        case 0xF: red = 255; green = 255; blue = 255; break; // White
+        default: LogMessage::GetSingleton()->DoLogMessage("Invalid mode 2 colour", true); assert(false); break;
+        }
     }
 }
 
-
-/////////////////////////////////////////////////////////////////////////
+bool TMS9918A::screenDisabled = true;
+bool TMS9918A::frameToggle = true;
 
 TMS9918A::TMS9918A()
-    : m_RunningCycles       (0.f),
-    m_ClockInfo             (0),
-    m_IsPAL                 (true),
-    m_NumScanlines          (NUM_NTSC_VERTICAL),
-    m_IsVBlank              (false),
-    m_Status                (0),
-    m_ControlWord           (0),
-    m_TempWord              (0),
-    m_IsSecondControlWrite  (false),
-    m_RequestInterupt       (false),
-    m_UseGFXOpt             (false),
+    : m_runningCycles       (0.f),
+    m_clockInfo             (0),
+    m_isPAL                 (true),
+    m_numScanlines          (NUM_NTSC_VERTICAL),
+    m_isVBlank              (false),
+    m_status                (0),
+    m_controlWord           (0),
+    m_tempWord              (0),
+    m_isSecondControlWrite  (false),
+    m_requestInterrupt      (false),
+    m_useGFXOpt             (false),
     m_VCounter              (0),
     m_HCounter              (0),
     m_VCounterFirst         (true),
-    m_LineInterupt          (0xFF),
+    m_lineInterrupt         (0xFF),
     m_VScroll               (0),
-    m_ReadBuffer            (0),
-    m_Height                (NUM_RES_VERTICAL),
-    m_Width                 (NUM_RES_HORIZONTAL),
-    m_Refresh               (false),
-    m_RefreshRatePerSecond  (0)
+    m_readBuffer            (0),
+    m_width                 (NUM_RES_HORIZONTAL),
+    m_height                (NUM_RES_VERTICAL),
+    m_refresh               (false),
+    m_refreshRatePerSecond  (0)
 {
-    Reset(false);
+    reset(false);
 }
 
-/////////////////////////////////////////////////////////////////////////
-
-void TMS9918A::Reset(bool isPAL)
+//public
+void TMS9918A::update(float nextCycle)
 {
-    m_RefreshRatePerSecond = 0;
-    m_ClockInfo = 0;
-    std::memset(&m_VRAM, 0, sizeof(m_VRAM));
-    std::memset(&m_CRAM, 0, sizeof(m_CRAM));
-    std::memset(&m_VDPRegisters, 0, sizeof(m_VDPRegisters));
-
-    m_VDPRegisters[0x2] = 0xFF; // will deafualt name table to 0x3800
-    m_VDPRegisters[0x3] = 0xFF; // must set all bits
-    m_VDPRegisters[0x4] = 0x07; // bits 2-0 should be set
-    m_VDPRegisters[0x5] = 0xFF; // will default sprite table to 0x3F00;
-    m_VDPRegisters[0xA] = 0xFF; // no line interupts to start with please
-    m_RequestInterupt = false;
-    m_ControlWord = 0;
-    m_TempWord = 0;
-    m_HCounter = 0;
-    m_VCounter = 0;
-    m_LineInterupt = 0xFF;
-    m_VScroll = 0;
-    m_ScreenDisabled = true;
-
-    // the rest of the vdp registers are unused
-
-    m_IsPAL = isPAL;
-    m_VCounterFirst = true;
-
-    m_NumScanlines = m_IsPAL ? NUM_PAL_VERTICAL : NUM_NTSC_VERTICAL;
-
-    m_Height = NUM_RES_VERTICAL;
-    m_RunningCycles = 0;
-
-    ResetScreen();
-}
-
-/////////////////////////////////////////////////////////////////////////
-
-void TMS9918A::Update(float nextCycle)
-{
-    m_RequestInterupt = testBit(m_Status,7) && IsRegBitSet(1,5);
+    m_requestInterrupt = testBit(m_status, 7) && isRegBitSet(1, 5);
 
     WORD hcount = m_HCounter;
     bool nextline = false;
-    m_IsVBlank = false;
-    m_Refresh = false;
+    m_isVBlank = false;
+    m_refresh = false;
 
-    m_RunningCycles += nextCycle;
+    m_runningCycles += nextCycle;
 
-    int clockInfo = static_cast<int>(floorf(m_RunningCycles));
+    int clockInfo = static_cast<int>(std::floor(m_runningCycles));
 
-    m_ClockInfo += clockInfo;
+    m_clockInfo += clockInfo;
 
     // the hcounter moves on by the same number of
     // machine cycles not the graphic cards clock cycle. The machine cycle is twice the speed of the vdp
@@ -164,246 +124,319 @@ void TMS9918A::Update(float nextCycle)
         // are we coming to the end of the vertical refresh?
         if (vcount == 255)
         {
-            m_RefreshRatePerSecond++;
+            m_refreshRatePerSecond++;
             m_VCounter = 0;
             m_VCounterFirst = true;
             
-            if (!m_UseGFXOpt)
+            if (!m_useGFXOpt)
             {
-                Render();
+                render();
             }
-            m_Refresh = true;
+            m_refresh = true;
         }
-        else if ((m_VCounter == GetVJump()) && m_VCounterFirst) 
+        else if ((m_VCounter == getVJump()) && m_VCounterFirst) 
         {
             m_VCounterFirst = false;
-            m_VCounter = GetVJumpTo();
+            m_VCounter = getVJumpTo();
         }
 
         // are we just about to enter vertical refresh?
-        else if (m_VCounter == m_Height)
+        else if (m_VCounter == m_height)
         {
-            if (m_UseGFXOpt)
+            if (m_useGFXOpt)
             {
-                RenderOpt();
+                renderOpt();
             }
-            m_IsVBlank = true;
-            m_Status = bitSet(m_Status, 7);
+            m_isVBlank = true;
+            m_status = bitSet(m_status, 7);
         }
 
-        if (m_VCounter >= m_Height)
+        if (m_VCounter >= m_height)
         {
             // do not reload the line interupt until we are past the FIRST line of the none active display period
-            if (m_VCounter != m_Height)
+            if (m_VCounter != m_height)
             {
-                m_LineInterupt = m_VDPRegisters[0xA];
+                m_lineInterrupt = m_VDPRegisters[0xA];
             }
 
             m_VScroll = m_VDPRegisters[0x9];
-            BYTE mode = GetVDPMode();
+            BYTE mode = getVDPMode();
             if (mode == 11)
             {
-                m_Height = NUM_RES_VERT_MED;
+                m_height = NUM_RES_VERT_MED;
             }
             else if (mode == 14)
             {
-                m_Height = NUM_RES_VERT_HIGH;
+                m_height = NUM_RES_VERT_HIGH;
             }
             else
             {
-                m_Height = NUM_RES_VERTICAL;
+                m_height = NUM_RES_VERTICAL;
             }
         }
 
         // else if we are still drawing the screen then draw next scanline
-        if (m_VCounter < m_Height)
+        if (m_VCounter < m_height)
         {
-            m_ScreenDisabled = !IsRegBitSet(1,6);
+            screenDisabled = !isRegBitSet(1, 6);
             
-            if (!m_UseGFXOpt)
+            if (!m_useGFXOpt)
             {
-                Render();
+                render();
             }
         }
 
         // decrement the line interupt counter during the active display period
         // including the first line of the none active display period
-        if (m_VCounter <= m_Height)
+        if (m_VCounter <= m_height)
         {
             bool underflow = false;
-            if (m_LineInterupt == 0)
+            if (m_lineInterrupt == 0)
             {
                 underflow = true;
             }
-            m_LineInterupt--;
+            m_lineInterrupt--;
 
             // it is going to underflow
             if (underflow)
             {
-                m_LineInterupt = m_VDPRegisters[0xA];
-                if (IsRegBitSet(0, 4))
+                m_lineInterrupt = m_VDPRegisters[0xA];
+                if (isRegBitSet(0, 4))
                 {
-                    m_RequestInterupt = true;
+                    m_requestInterrupt = true;
                 }
             }
         }
     }
-    if (testBit(m_Status, 7) && IsRegBitSet(1, 5))
+    if (testBit(m_status, 7) && isRegBitSet(1, 5))
     {
-        m_RequestInterupt = true;
+        m_requestInterrupt = true;
     }
 
-    m_RunningCycles -= clockInfo;
+    m_runningCycles -= clockInfo;
 }
 
-/////////////////////////////////////////////////////////////////////////
+void TMS9918A::reset(bool isPAL)
+{
+    m_refreshRatePerSecond = 0;
+    m_clockInfo = 0;
 
-BYTE TMS9918A::ReadMemory(BYTE address)
+    std::fill(m_VRAM.begin(), m_VRAM.end(), 0);
+    std::fill(m_CRAM.begin(), m_CRAM.end(), 0);
+    std::fill(m_VDPRegisters.begin(), m_VDPRegisters.end(), 0);
+
+    m_VDPRegisters[0x2] = 0xFF; // will deafualt name table to 0x3800
+    m_VDPRegisters[0x3] = 0xFF; // must set all bits
+    m_VDPRegisters[0x4] = 0x07; // bits 2-0 should be set
+    m_VDPRegisters[0x5] = 0xFF; // will default sprite table to 0x3F00;
+    m_VDPRegisters[0xA] = 0xFF; // no line interupts to start with please
+    m_requestInterrupt = false;
+    m_controlWord = 0;
+    m_tempWord = 0;
+    m_HCounter = 0;
+    m_VCounter = 0;
+    m_lineInterrupt = 0xFF;
+    m_VScroll = 0;
+    screenDisabled = true;
+
+    // the rest of the vdp registers are unused
+
+    m_isPAL = isPAL;
+    m_VCounterFirst = true;
+
+    m_numScanlines = m_isPAL ? NUM_PAL_VERTICAL : NUM_NTSC_VERTICAL;
+
+    m_height = NUM_RES_VERTICAL;
+    m_runningCycles = 0;
+
+    resetScreen();
+}
+
+BYTE TMS9918A::readMemory(BYTE address)
 {
     return m_VRAM[address];
 }
 
-/////////////////////////////////////////////////////////////////////////
-
-void TMS9918A::WriteMemory(BYTE address, BYTE data)
+void TMS9918A::writeMemory(BYTE address, BYTE data)
 {
     m_VRAM[address] = data;
 }
 
-/////////////////////////////////////////////////////////////////////////
-
-BYTE TMS9918A::GetStatus()
+void TMS9918A::writeVDPAddress(BYTE data)
 {
-    BYTE res = m_Status;
-    if (GetVDPMode() == 2)
+    //  char buffer[200];
+    //  sprintf(buffer, "Value before write is %x", GetAddressRegister());
+    //  LogMessage::GetSingleton()->DoLogMessage(buffer,false);
+    if (m_isSecondControlWrite)
     {
-        m_Status &= 0x2F; // turn off bits 7 and 5
-    }
-    else
-    {
-        m_Status &= 0x1F; // turn off top 3 bits
-    }
-    m_IsSecondControlWrite = false;
-    m_RequestInterupt = false;
+        m_controlWord &= 0xFF;
+        m_controlWord |= data << 8;
+        m_tempWord &= 0xFF;
+        m_tempWord |= data << 8;
+        //  m_controlWord = m_tempWord;
+        m_isSecondControlWrite = false;
 
-    return res;
-}
-
-/////////////////////////////////////////////////////////////////////////
-
-void TMS9918A::WriteVDPAddress(BYTE data)
-{
-//  char buffer[200];
-//  sprintf(buffer, "Value before write is %x", GetAddressRegister());
-//  LogMessage::GetSingleton()->DoLogMessage(buffer,false);
-    if (m_IsSecondControlWrite)
-    {
-        m_ControlWord &= 0xFF;
-        m_ControlWord |= data << 8;
-        m_TempWord &= 0xFF;
-        m_TempWord |= data << 8;
-    //  m_ControlWord = m_TempWord;
-        m_IsSecondControlWrite = false;
-
-        switch (GetCodeRegister())
+        switch (getCodeRegister())
         {
-            case 0: m_ReadBuffer = m_VRAM[GetAddressRegister()]; IncrementAddress(); break;
-            case 1: break;
-            case 2: SetRegData();break;
-            case 3: break;
+        case 0: m_readBuffer = m_VRAM[getAddressRegister()]; incrementAddress(); break;
+        case 1: break;
+        case 2: setRegData(); break;
+        case 3: break;
         }
     }
 
     else
     {
-        m_TempWord &= 0xFF00;
-        m_TempWord |= data;
-        m_IsSecondControlWrite = true;
-        m_ControlWord &= 0xFF00;
-        m_ControlWord |= data;
+        m_tempWord &= 0xFF00;
+        m_tempWord |= data;
+        m_isSecondControlWrite = true;
+        m_controlWord &= 0xFF00;
+        m_controlWord |= data;
     }
-//  sprintf(buffer, "Value after write is %x", GetAddressRegister());
-//  LogMessage::GetSingleton()->DoLogMessage(buffer,false);
+    //  sprintf(buffer, "Value after write is %x", GetAddressRegister());
+    //  LogMessage::GetSingleton()->DoLogMessage(buffer,false);
 }
 
-/////////////////////////////////////////////////////////////////////////
-
-BYTE TMS9918A::ReadDataPort()
+BYTE TMS9918A::readDataPort()
 {
-    m_IsSecondControlWrite = false;
+    m_isSecondControlWrite = false;
 
-    BYTE res = m_ReadBuffer;
+    BYTE res = m_readBuffer;
 
-    switch (GetCodeRegister())
+    switch (getCodeRegister())
     {
-        case 0: m_ReadBuffer = m_VRAM[GetAddressRegister()]; break; // not sure about this one
-        case 1: m_ReadBuffer = m_VRAM[GetAddressRegister()]; break;
+        case 0: m_readBuffer = m_VRAM[getAddressRegister()]; break; // not sure about this one
+        case 1: m_readBuffer = m_VRAM[getAddressRegister()]; break;
         default: assert(false); break;
     }
 
-    IncrementAddress();
+    incrementAddress();
 
     return res;
 }
 
-/////////////////////////////////////////////////////////////////////////
-
-void TMS9918A::WriteDataPort(BYTE data)
+void TMS9918A::writeDataPort(BYTE data)
 {
 
-    m_IsSecondControlWrite = false;
-    BYTE code = GetCodeRegister();
+    m_isSecondControlWrite = false;
+    BYTE code = getCodeRegister();
 
     switch (code)
     {
-        case 0: m_VRAM[GetAddressRegister()] = data; break; // not sure about this one
-        case 1: m_VRAM[GetAddressRegister()] = data; break;
-        case 2: m_VRAM[GetAddressRegister()] = data; break;
-        case 3: m_CRAM[GetAddressRegister() & 31] = data; break; // write to CRAM
+        case 0: m_VRAM[getAddressRegister()] = data; break; // not sure about this one
+        case 1: m_VRAM[getAddressRegister()] = data; break;
+        case 2: m_VRAM[getAddressRegister()] = data; break;
+        case 3: m_CRAM[getAddressRegister() & 31] = data; break; // write to CRAM
         default: assert(false); break;
     }
 
-    m_ReadBuffer = data;
+    m_readBuffer = data;
 
-    IncrementAddress();
+    incrementAddress();
 }
 
-/////////////////////////////////////////////////////////////////////////
-
-void TMS9918A::IncrementAddress()
+BYTE TMS9918A::getStatus()
 {
-    
-    if (GetAddressRegister() == 0x3FFF)
+    BYTE res = m_status;
+    if (getVDPMode() == 2)
     {
-        m_ControlWord &= 0xC000;
+        m_status &= 0x2F; // turn off bits 7 and 5
     }
     else
     {
-        m_ControlWord++;
+        m_status &= 0x1F; // turn off top 3 bits
+    }
+    m_isSecondControlWrite = false;
+    m_requestInterrupt = false;
+
+    return res;
+}
+
+void TMS9918A::resetScreen()
+{
+    if (m_useGFXOpt)
+    {
+        frameToggle = !frameToggle;
+    }
+    else
+    {
+        frameToggle = true;
+    }
+
+    if (m_height == NUM_RES_VERTICAL)
+    {
+        std::memset(screenStandard, SCREENBLANKCOLOUR, sizeof(screenStandard));
+    }
+    else if (m_height == NUM_RES_VERT_MED)
+    {
+        std::memset(screenMed, SCREENBLANKCOLOUR, sizeof(screenMed));
+    }
+    else if (m_height == NUM_RES_VERT_HIGH)
+    {
+        std::memset(screenHigh, SCREENBLANKCOLOUR, sizeof(screenHigh));
     }
 }
 
-/////////////////////////////////////////////////////////////////////////
-
-WORD TMS9918A::GetAddressRegister() const
+BYTE TMS9918A::getHCounter() const
 {
-    return m_ControlWord & 0x3FFF;
+    // only uses 9 bits
+    WORD mod = m_HCounter & 511;
+    //mod >> 1; //this must be a typo, right? - M
+    mod >>= 1;
+    BYTE res = mod & 0xFFFF;
+    return res;
 }
 
-/////////////////////////////////////////////////////////////////////////
-
-BYTE TMS9918A::GetCodeRegister() const
+bool TMS9918A::getRefresh()
 {
-    WORD w = m_ControlWord >> 14;
-    return (BYTE)w;
+    if (m_refresh)
+    {
+        m_refresh = false;
+        return true;
+    }
+    return false;
 }
 
-/////////////////////////////////////////////////////////////////////////
-
-void TMS9918A::SetRegData()
+void TMS9918A::dumpClockInfo()
 {
-    BYTE data = m_ControlWord & 0xFF;
-    BYTE reg = m_ControlWord >> 8;
+    char buffer[255];
+    std::memset(buffer, 0, sizeof(buffer));
+    sprintf(buffer, "Graphics Chip Clock Cycles Per Second: %lu There has been %d frames", m_clockInfo, m_refreshRatePerSecond);
+    LogMessage::GetSingleton()->DoLogMessage(buffer, true);
+
+    m_clockInfo = 0;
+    m_refreshRatePerSecond = 0;
+}
+
+//private
+WORD TMS9918A::getAddressRegister() const
+{
+    return m_controlWord & 0x3FFF;
+}
+
+BYTE TMS9918A::getCodeRegister() const
+{
+    WORD w = m_controlWord >> 14;
+    return static_cast<BYTE>(w);
+}
+
+void TMS9918A::incrementAddress()
+{
+    
+    if (getAddressRegister() == 0x3FFF)
+    {
+        m_controlWord &= 0xC000;
+    }
+    else
+    {
+        m_controlWord++;
+    }
+}
+
+void TMS9918A::setRegData()
+{
+    BYTE data = m_controlWord & 0xFF;
+    BYTE reg = m_controlWord >> 8;
     reg &= 0xF;
 
     if (reg > 11)
@@ -415,26 +448,49 @@ void TMS9918A::SetRegData()
 
     if (reg == 5)
     {
-        if (testBit(m_Status, 7) && IsRegBitSet(1, 5))
+        if (testBit(m_status, 7) && isRegBitSet(1, 5))
         {
-            m_RequestInterupt = true;
+            m_requestInterrupt = true;
         }
     }
 }
 
-/////////////////////////////////////////////////////////////////////////
-
-void TMS9918A::RenderOpt()
+void TMS9918A::render()
 {
-    if (!m_FrameToggle)
+    if (!frameToggle)
+    {
+        return;
+    }
+
+    BYTE mode = getVDPMode();
+        
+    // this may seem strange rendering sprites before background, however
+    // it makes it easier to detect sprite collisions and get the background
+    // priority working.
+
+    if (mode == 2)
+    {
+        renderSpritesMode2();
+        renderBackgroundMode2();          
+    }
+    else
+    {
+        renderSpritesMode4();
+        renderBackgroundMode4();
+    }
+}
+
+void TMS9918A::renderOpt()
+{
+    if (!frameToggle)
     {
         return;
     }
 
     BYTE vCounterBackup = m_VCounter;
-    BYTE mode = GetVDPMode();
+    BYTE mode = getVDPMode();
 
-    for (int i = 0; i < m_Height; i++)
+    for (int i = 0; i < m_height; i++)
     {
         m_VCounter = i;    
         // this may seem strange rendering sprites before background, however
@@ -443,55 +499,26 @@ void TMS9918A::RenderOpt()
 
         if (mode == 2)
         {
-            RenderSpritesMode2();
-            RenderBackgroundMode2();          
+            renderSpritesMode2();
+            renderBackgroundMode2();          
         }
         else
         {
-            RenderSpritesMode4();
-            RenderBackgroundMode4();
+            renderSpritesMode4();
+            renderBackgroundMode4();
         }
     }
     m_VCounter = vCounterBackup;
 }
 
-/////////////////////////////////////////////////////////////////////////
-
-void TMS9918A::Render()
+void TMS9918A::renderSpritesMode2()
 {
-    if (!m_FrameToggle)
-    {
-        return;
-    }
-
-    BYTE mode = GetVDPMode();
-        
-    // this may seem strange rendering sprites before background, however
-    // it makes it easier to detect sprite collisions and get the background
-    // priority working.
-
-    if (mode == 2)
-    {
-        RenderSpritesMode2();
-        RenderBackgroundMode2();          
-    }
-    else
-    {
-        RenderSpritesMode4();
-        RenderBackgroundMode4();
-    }
-}
-
-/////////////////////////////////////////////////////////////////////////
-
-void TMS9918A::RenderSpritesMode2()
-{
-    WORD satbase = GetSATBase();
+    WORD satbase = getSATBase();
     WORD sgtable = m_VDPRegisters[0x6] & 7;
     sgtable <<= 11;
     
-    int size = IsRegBitSet(1, 1) ? 16 : 8;
-    //bool isZoomed = IsRegBitSet(1, 0);
+    int size = isRegBitSet(1, 1) ? 16 : 8;
+    //bool isZoomed = isRegBitSet(1, 0);
 
     int spriteCount = 0;
 
@@ -504,10 +531,10 @@ void TMS9918A::RenderSpritesMode2()
         if (y == 0xD0)
         {
             // if there is no illegal sprites then store this sprite in the status
-            if (!testBit(m_Status,6))
+            if (!testBit(m_status,6))
             {
-                m_Status &= 0xE0; // turn off last 5 bits
-                m_Status |= sprite; // puts sprite into last 5 bits
+                m_status &= 0xE0; // turn off last 5 bits
+                m_status |= sprite; // puts sprite into last 5 bits
             }
             return; // need to return not break otherwise outside of for loop will overwrite last 5 bits of status
         }
@@ -542,95 +569,53 @@ void TMS9918A::RenderSpritesMode2()
 
             if (spriteCount > 4)
             {
-                SetMode2IllegalSprites(sprite);
+                setMode2IllegalSprites(sprite);
                 return; // need to return otherwise outside of for loop will reset last 5 bits of sprite
             }
             else
             {
-                m_Status = bitReset(m_Status, 6); // not an illegal sprite
+                m_status = bitReset(m_status, 6); // not an illegal sprite
             }
 
             int line = m_VCounter - y;
         
             if (size == 8)
             {
-                DrawMode2Sprite(sgtable + (pattern * 8), x, line, colour);
+                drawMode2Sprite(sgtable + (pattern * 8), x, line, colour);
             }
             else
             {
                 WORD address = sgtable + ((pattern & 252) * 8);
-                DrawMode2Sprite(address, x, line, colour);
-                DrawMode2Sprite(address, x+8, line+16, colour);
+                drawMode2Sprite(address, x, line, colour);
+                drawMode2Sprite(address, x+8, line+16, colour);
             }
         }
     }
 
-    m_Status &= 0xE0; // turn off last 5 bits
-    m_Status |= 31; // puts last sprite into last 5 bits   
+    m_status &= 0xE0; // turn off last 5 bits
+    m_status |= 31; // puts last sprite into last 5 bits   
 }
 
-/////////////////////////////////////////////////////////////////////////
-
-void TMS9918A::SetMode2IllegalSprites(BYTE sprite)
-{
-    m_Status = bitSet(m_Status, 6);
-    m_Status &= 0xE0; // turn off last 5 bits
-    m_Status |= sprite; // puts sprite into last 5 bits
-}
-
-/////////////////////////////////////////////////////////////////////////
-
-void TMS9918A::DrawMode2Sprite(const WORD& address, BYTE x, BYTE line, BYTE colour)
-{
-    BYTE red = 0;
-    BYTE green = 0;
-    BYTE blue = 0;
-
-    GetOldStyleColour(colour, red,green,blue);
-    BYTE invert = 7;
-    for (int i = 0; i < 8; i++, invert--)
-    {
-        BYTE drawLine = m_VRAM[address+line];
-        BYTE xpos = x + i;
-
-        // is this a sprite collision?
-        if (GetScreenPixelColour(xpos,m_VCounter,0) != SCREENBLANKCOLOUR)
-        {
-            m_Status = bitSet(m_Status,5);
-            continue;
-        }
-
-        if (!testBit(drawLine, invert))
-        {
-            continue;
-        }
-
-        WriteToScreen(xpos, m_VCounter, red,green,blue);
-    }
-}
-
-/////////////////////////////////////////////////////////////////////////
-
-void TMS9918A::RenderSpritesMode4()
+void TMS9918A::renderSpritesMode4()
 {
     int vCounter = m_VCounter;
     int spriteCount = 0;
-    WORD satbase = GetSATBase();
+    WORD satbase = getSATBase();
 
     bool is8x16 = false;
     int size = 8;      
 
-    bool shiftX = IsRegBitSet(0,3);
-    bool useSecondPattern = IsRegBitSet(6,2);
+    bool shiftX = isRegBitSet(0, 3);
+    bool useSecondPattern = isRegBitSet(6, 2);
 
     // is it 8x16 sprite?
-    if (IsRegBitSet(1, 1))
+    if (isRegBitSet(1, 1))
     {
         is8x16 = true;
         size = 16;
     }
 
-    if (IsRegBitSet(1,0))
+    if (isRegBitSet(1, 0))
     {
         size = 16;
     }
@@ -639,7 +624,7 @@ void TMS9918A::RenderSpritesMode4()
     {
         int y = m_VRAM[satbase+sprite];
 
-        if ((m_Height == NUM_RES_VERTICAL) && (y == 0xD0))
+        if ((m_height == NUM_RES_VERTICAL) && (y == 0xD0))
         {
             break;
         }
@@ -659,7 +644,7 @@ void TMS9918A::RenderSpritesMode4()
 
             if (spriteCount >8)
             {
-                SetSpriteOverflow();
+                setSpriteOverflow();
                 break;
             }
 
@@ -703,9 +688,9 @@ void TMS9918A::RenderSpritesMode4()
                 }
 
                 // is this a sprite collision?
-                if (GetScreenPixelColour(x+i,vCounter,0) != SCREENBLANKCOLOUR)
+                if (getScreenPixelColour(x+i, vCounter, 0) != SCREENBLANKCOLOUR)
                 {
-                    SetSpriteCollision();
+                    setSpriteCollision();
                     continue;
                 }
                 BYTE palette = 0;
@@ -734,38 +719,15 @@ void TMS9918A::RenderSpritesMode4()
                 colour >>=2;
                 BYTE blue = colour & 0x3;
 
-                WriteToScreen(x+i, vCounter,GetColourShade(red),GetColourShade(green),GetColourShade(blue));
+                writeToScreen(x+i, vCounter, getColourShade(red), getColourShade(green), getColourShade(blue));
             }
         }
     }
 }
 
-/////////////////////////////////////////////////////////////////////////
-
-bool TMS9918A::IsRegBitSet(int reg, BYTE bit)
+void TMS9918A::renderBackgroundMode2()
 {
-    return testBit(m_VDPRegisters[reg], bit);
-}
-
-/////////////////////////////////////////////////////////////////////////
-
-void TMS9918A::SetSpriteOverflow()
-{
-    m_Status = bitSet(m_Status, 6);
-}
-
-/////////////////////////////////////////////////////////////////////////
-
-void TMS9918A::SetSpriteCollision()
-{
-    m_Status = bitSet(m_Status, 5);
-}
-
-/////////////////////////////////////////////////////////////////////////
-
-void TMS9918A::RenderBackgroundMode2()
-{
-    WORD nameBase = GetNameBase();
+    WORD nameBase = getNameBase();
 
     // reg 3 contains colour table info
     BYTE reg3 = m_VDPRegisters[0x3];
@@ -864,7 +826,7 @@ void TMS9918A::RenderBackgroundMode2()
             GetOldStyleColour(colNum, red,green,blue);
             int xpos = (column * 8) + x;
 
-            if (GetScreenPixelColour(xpos, m_VCounter, 0) != SCREENBLANKCOLOUR)
+            if (getScreenPixelColour(xpos, m_VCounter, 0) != SCREENBLANKCOLOUR)
             {
                 continue;
             }
@@ -874,16 +836,14 @@ void TMS9918A::RenderBackgroundMode2()
                 continue;
             }
 
-            WriteToScreen(xpos, m_VCounter, red,green,blue);       
+            writeToScreen(xpos, m_VCounter, red,green,blue);       
         }
     }
 }
 
-/////////////////////////////////////////////////////////////////////////
-
-void TMS9918A::RenderBackgroundMode4()
+void TMS9918A::renderBackgroundMode4()
 {
-    WORD nameBase = GetNameBase();
+    WORD nameBase = getNameBase();
     int vCounter = m_VCounter;
     BYTE vScroll = m_VScroll; // v scrolling only gets updated outside active display
     BYTE hScroll = m_VDPRegisters[0x8];
@@ -893,13 +853,13 @@ void TMS9918A::RenderBackgroundMode4()
     BYTE hStartingCol = hScroll >> 3;
     BYTE hFineScroll = hScroll & 0x7;
 
-    bool limitVScroll = IsRegBitSet(0, 7);
-    bool limitHScroll = IsRegBitSet(0, 6);
+    bool limitVScroll = isRegBitSet(0, 7);
+    bool limitHScroll = isRegBitSet(0, 6);
 
     int row = vCounter;
     row /= 8;
 
-    bool maskFirstColumn = IsRegBitSet(0,5);
+    bool maskFirstColumn = isRegBitSet(0,5);
 
     // draw all 32 columns
     for (int column = 0; column < 32; column++)
@@ -922,7 +882,7 @@ void TMS9918A::RenderBackgroundMode4()
                 xpos = hStartingCol;
                 xpos *= 8;
                 xpos += xpixel + hFineScroll;
-                xpos = xpos % m_Width;
+                xpos = xpos % m_width;
             }           
 
             bool allowvscroll = (((xpos/8) > 23) && limitVScroll)?false:true;
@@ -939,7 +899,7 @@ void TMS9918A::RenderBackgroundMode4()
                     vrow++;
                 }
 
-                int mod = (m_Height == NUM_RES_VERTICAL) ? 28 : 32;
+                int mod = (m_height == NUM_RES_VERTICAL) ? 28 : 32;
                 vrow = vrow % mod;
             }           
 
@@ -1026,7 +986,7 @@ void TMS9918A::RenderBackgroundMode4()
             BYTE blue = colour & 0x3;      
 
             // a sprite is drawn here so lets not overwrite it :)
-            if (!masking && !hiPriority && (GetScreenPixelColour(xpos, m_VCounter, 0) != SCREENBLANKCOLOUR))
+            if (!masking && !hiPriority && (getScreenPixelColour(xpos, m_VCounter, 0) != SCREENBLANKCOLOUR))
             {
                 continue;
             }
@@ -1036,44 +996,30 @@ void TMS9918A::RenderBackgroundMode4()
                 continue;
             }
 
-            WriteToScreen(xpos,vCounter,GetColourShade(red),GetColourShade(green),GetColourShade(blue));
+            writeToScreen(xpos,vCounter, getColourShade(red), getColourShade(green), getColourShade(blue));
         }
         hStartingCol = (hStartingCol + 1) % 32;
     }
 }
 
-/////////////////////////////////////////////////////////////////////////
-
-void TMS9918A::ResetScreen()
+bool TMS9918A::isRegBitSet(int reg, BYTE bit)
 {
-    if (m_UseGFXOpt)
-    {
-        m_FrameToggle = !m_FrameToggle;
-    }
-    else
-    {
-        m_FrameToggle = true;
-    }
-
-    if (m_Height == NUM_RES_VERTICAL)
-    {
-        std::memset(m_ScreenStandard, SCREENBLANKCOLOUR, sizeof(m_ScreenStandard));
-    }
-    else if (m_Height == NUM_RES_VERT_MED)
-    {
-        std::memset(m_ScreenMed, SCREENBLANKCOLOUR, sizeof(m_ScreenMed));
-    }
-    else if (m_Height == NUM_RES_VERT_HIGH)
-    {
-        std::memset(m_ScreenHigh, SCREENBLANKCOLOUR, sizeof(m_ScreenHigh));
-    }
+    return testBit(m_VDPRegisters[reg], bit);
 }
 
-/////////////////////////////////////////////////////////////////////////
-
-// returns the base address of the sprite attribute table
-WORD TMS9918A::GetSATBase() const
+void TMS9918A::setSpriteOverflow()
 {
+    m_status = bitSet(m_status, 6);
+}
+
+void TMS9918A::setSpriteCollision()
+{
+    m_status = bitSet(m_status, 5);
+}
+
+WORD TMS9918A::getSATBase() const
+{
+    // returns the base address of the sprite attribute table
     BYTE reg5 = m_VDPRegisters[0x5];
 
     // bits 7 and 0 are ignored
@@ -1084,18 +1030,16 @@ WORD TMS9918A::GetSATBase() const
     return res;
 }
 
-/////////////////////////////////////////////////////////////////////////
-
-// returns the base address of the name table
-WORD TMS9918A::GetNameBase() const
+WORD TMS9918A::getNameBase() const
 {
+    // returns the base address of the name table
     BYTE reg2 = m_VDPRegisters[0x2];
 
     // bit 0 is ignored so is top nibble
     reg2 &= 0xF;
     reg2 = bitReset(reg2,0);
 
-    if (m_Height != NUM_RES_VERTICAL)
+    if (m_height != NUM_RES_VERTICAL)
     {
         // only bits 2 and 3 set name base
         reg2 >>= 2;
@@ -1115,9 +1059,7 @@ WORD TMS9918A::GetNameBase() const
     return res;
 }
 
-/////////////////////////////////////////////////////////////////////////
-
-BYTE TMS9918A::GetColourShade(BYTE val) const
+BYTE TMS9918A::getColourShade(BYTE val) const
 {
     switch (val)
     {
@@ -1129,9 +1071,7 @@ BYTE TMS9918A::GetColourShade(BYTE val) const
     }
 }
 
-/////////////////////////////////////////////////////////////////////////
-
-BYTE TMS9918A::GetVDPMode() const
+BYTE TMS9918A::getVDPMode() const
 {
     BYTE res = 0;
     res |= bitGetVal(m_VDPRegisters[0x0],2) << 3;
@@ -1141,59 +1081,53 @@ BYTE TMS9918A::GetVDPMode() const
     return res;
 }
 
-/////////////////////////////////////////////////////////////////////////
-
-void TMS9918A::WriteToScreen(BYTE x, BYTE y,BYTE red, BYTE green, BYTE blue)
+void TMS9918A::writeToScreen(BYTE x, BYTE y,BYTE red, BYTE green, BYTE blue)
 {
-    if (m_Height == NUM_RES_VERTICAL)
+    if (m_height == NUM_RES_VERTICAL)
     {
-        m_ScreenStandard[y][x][0] = red;
-        m_ScreenStandard[y][x][1] = green;
-        m_ScreenStandard[y][x][2] = blue;
+        screenStandard[y][x][0] = red;
+        screenStandard[y][x][1] = green;
+        screenStandard[y][x][2] = blue;
     }
-    else if (m_Height == NUM_RES_VERT_MED)
+    else if (m_height == NUM_RES_VERT_MED)
     {
-        m_ScreenMed[y][x][0] = red;
-        m_ScreenMed[y][x][1] = green;
-        m_ScreenMed[y][x][2] = blue;
+        screenMed[y][x][0] = red;
+        screenMed[y][x][1] = green;
+        screenMed[y][x][2] = blue;
     }
-    else if (m_Height == NUM_RES_VERT_HIGH)
+    else if (m_height == NUM_RES_VERT_HIGH)
     {
-        m_ScreenHigh[y][x][0] = red;
-        m_ScreenHigh[y][x][1] = green;
-        m_ScreenHigh[y][x][2] = blue;
+        screenHigh[y][x][0] = red;
+        screenHigh[y][x][1] = green;
+        screenHigh[y][x][2] = blue;
     }
 }
 
-/////////////////////////////////////////////////////////////////////////
-
-BYTE TMS9918A::GetScreenPixelColour(BYTE x, BYTE y, int index) const
+BYTE TMS9918A::getScreenPixelColour(BYTE x, BYTE y, int index) const
 {
-    if (m_Height == NUM_RES_VERTICAL)
+    if (m_height == NUM_RES_VERTICAL)
     {
-        return m_ScreenStandard[y][x][index] ;
+        return screenStandard[y][x][index] ;
     }
-    else if (m_Height == NUM_RES_VERT_MED)
+    else if (m_height == NUM_RES_VERT_MED)
     {
-        return m_ScreenMed[y][x][index] ;
+        return screenMed[y][x][index] ;
     }
     else
     {
-        return m_ScreenHigh[y][x][index] ;
+        return screenHigh[y][x][index] ;
     }
 }
 
-/////////////////////////////////////////////////////////////////////////
-
-BYTE TMS9918A::GetVJump() const
+BYTE TMS9918A::getVJump() const
 {
-    if (m_IsPAL)
+    if (m_isPAL)
     {
-        if (m_Height == NUM_RES_VERTICAL)
+        if (m_height == NUM_RES_VERTICAL)
         {
             return 0xF2;
         }
-        else if (m_Height == NUM_RES_VERT_MED)
+        else if (m_height == NUM_RES_VERT_MED)
         {
             return 0xFF;
         }
@@ -1204,11 +1138,11 @@ BYTE TMS9918A::GetVJump() const
     }
     else
     {
-        if (m_Height == NUM_RES_VERTICAL)
+        if (m_height == NUM_RES_VERTICAL)
         {
             return 0xDA;
         }
-        else if (m_Height == NUM_RES_VERT_MED)
+        else if (m_height == NUM_RES_VERT_MED)
         {
             return 0xEA;
         }
@@ -1220,17 +1154,15 @@ BYTE TMS9918A::GetVJump() const
     }
 }
 
-/////////////////////////////////////////////////////////////////////////
-
-BYTE TMS9918A::GetVJumpTo() const
+BYTE TMS9918A::getVJumpTo() const
 {
-    if (m_IsPAL)
+    if (m_isPAL)
     {
-        if (m_Height == NUM_RES_VERTICAL)
+        if (m_height == NUM_RES_VERTICAL)
         {
             return 0xBA;
         }
-        else if (m_Height == NUM_RES_VERT_MED)
+        else if (m_height == NUM_RES_VERT_MED)
         {
             return 0xC7;
         }
@@ -1241,11 +1173,11 @@ BYTE TMS9918A::GetVJumpTo() const
     }
     else
     {
-        if (m_Height == NUM_RES_VERTICAL)
+        if (m_height == NUM_RES_VERTICAL)
         {
             return 0xD5;
         }
-        else if (m_Height == NUM_RES_VERT_MED)
+        else if (m_height == NUM_RES_VERT_MED)
         {
             return 0xE5;
         }
@@ -1257,9 +1189,7 @@ BYTE TMS9918A::GetVJumpTo() const
     }
 }
 
-/////////////////////////////////////////////////////////////////////////
-
-void TMS9918A::DumpVRAM()
+void TMS9918A::dumpVRAM()
 {
     std::ofstream outputFile("c:/output.txt");
     for (int i = 0; i <= 0x3FFF; i++)
@@ -1284,40 +1214,38 @@ void TMS9918A::DumpVRAM()
     outputFile.close();
 }
 
-/////////////////////////////////////////////////////////////////////////
-
-bool TMS9918A::GetRefresh()
+void TMS9918A::drawMode2Sprite(const WORD& address, BYTE x, BYTE line, BYTE colour)
 {
-    if (m_Refresh)
+    BYTE red = 0;
+    BYTE green = 0;
+    BYTE blue = 0;
+
+    GetOldStyleColour(colour, red,green,blue);
+    BYTE invert = 7;
+    for (int i = 0; i < 8; i++, invert--)
     {
-        m_Refresh = false;
-        return true;
+        BYTE drawLine = m_VRAM[address+line];
+        BYTE xpos = x + i;
+
+        // is this a sprite collision?
+        if (getScreenPixelColour(xpos, m_VCounter, 0) != SCREENBLANKCOLOUR)
+        {
+            m_status = bitSet(m_status,5);
+            continue;
+        }
+
+        if (!testBit(drawLine, invert))
+        {
+            continue;
+        }
+
+        writeToScreen(xpos, m_VCounter, red,green,blue);
     }
-    return false;
 }
 
-/////////////////////////////////////////////////////////////////////////
-
-BYTE TMS9918A::GetHCounter() const
+void TMS9918A::setMode2IllegalSprites(BYTE sprite)
 {
-    // only uses 9 bits
-    WORD mod = m_HCounter & 511;
-    //mod >> 1; //this must be a typo, right? M
-    mod >>= 1;
-    BYTE res = mod & 0xFFFF;
-    return res;
+    m_status = bitSet(m_status, 6);
+    m_status &= 0xE0; // turn off last 5 bits
+    m_status |= sprite; // puts sprite into last 5 bits
 }
-
-/////////////////////////////////////////////////////////////////////////
-
-void TMS9918A::DumpClockInfo()
-{
-    char buffer[255];
-    std::memset(buffer, 0, sizeof(buffer));
-    sprintf(buffer, "Graphics Chip Clock Cycles Per Second: %lu There has been %d frames", m_ClockInfo, m_RefreshRatePerSecond);
-    LogMessage::GetSingleton()->DoLogMessage(buffer, true);
-
-    m_ClockInfo = 0;
-    m_RefreshRatePerSecond = 0;
-}
-/////////////////////////////////////////////////////////////////////////

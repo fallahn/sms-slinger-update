@@ -54,7 +54,7 @@ public:
     void setKeyReleased(int player, int key);
     void resetButton();
     void dumpClockInfo();
-    void setGFXOpt(bool useGFXOpt) { m_graphicsChip.SetGFXOpt(useGFXOpt); }
+    void setGFXOpt(bool useGFXOpt) { m_graphicsChip.setGFXOpt(useGFXOpt); }
     void checkInterupts();
 
 

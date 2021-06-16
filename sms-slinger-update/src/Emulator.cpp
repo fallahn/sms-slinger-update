@@ -188,7 +188,7 @@ void Emulator::insertCartridge(const char* path)
     m_thirdBankPage = 2;
 
     m_isPAL = false;
-    m_graphicsChip.Reset(m_isPAL);
+    m_graphicsChip.reset(m_isPAL);
     m_FPS = m_isPAL ? 50 : 60;
     m_isCodeMasters = isCodeMasters();
 
@@ -210,8 +210,8 @@ void Emulator::update()
     targetCPU /= m_FPS;
 
     m_cyclesThisUpdate = 0;
-    m_graphicsChip.ResetScreen();
-    while (!m_graphicsChip.GetRefresh())
+    m_graphicsChip.resetScreen();
+    while (!m_graphicsChip.getRefresh())
     //while (m_cyclesThisUpdate < targetCPU)
     { 
         int cycles = 0;
@@ -241,7 +241,7 @@ void Emulator::update()
         // graphics chips clock is half of that of the sms machine clock
         float vdpClock = static_cast<float>(cycles);
         vdpClock /= 2;
-        m_graphicsChip.Update(vdpClock);
+        m_graphicsChip.update(vdpClock);
 
         float soundCycles = static_cast<float>(cycles);
         soundCycles /= CPU_CYCLES_TO_MACHINE_CLICKS;
@@ -375,7 +375,7 @@ BYTE Emulator::readIOMemory(const BYTE& address)
         // even addresses are v counter, odd are h counter
         if ((address % 2)== 0)
         {
-            return m_graphicsChip.GetVCounter();
+            return m_graphicsChip.getVCounter();
         }
         return 0; // h counter
     }
@@ -385,18 +385,18 @@ BYTE Emulator::readIOMemory(const BYTE& address)
         //Even locations are data port, odd locations are control port.
         if ((address % 2)== 0)
         {
-            return m_graphicsChip.ReadDataPort();
+            return m_graphicsChip.readDataPort();
         }
-        return m_graphicsChip.GetStatus();    
+        return m_graphicsChip.getStatus();    
     }
 
     switch (address)
     {
-        case 0xBE: return m_graphicsChip.ReadDataPort(); break;
-        case 0xBF: return m_graphicsChip.GetStatus(); break;
-        case 0xBD: return m_graphicsChip.GetStatus(); break; // mirror of 0xBF
-        case 0x7F: return m_graphicsChip.GetHCounter() ; break; // hblank
-        case 0x7E: return m_graphicsChip.GetVCounter(); break; 
+        case 0xBE: return m_graphicsChip.readDataPort(); break;
+        case 0xBF: return m_graphicsChip.getStatus(); break;
+        case 0xBD: return m_graphicsChip.getStatus(); break; // mirror of 0xBF
+        case 0x7F: return m_graphicsChip.getHCounter() ; break; // hblank
+        case 0x7E: return m_graphicsChip.getVCounter(); break; 
         case 0xDC: return m_keyboardPorts[0]; break;
         case 0xC0: return m_keyboardPorts[0]; break; // mirror of 0xDC
         case 0xDD: return m_keyboardPorts[1]; break;
@@ -424,20 +424,20 @@ void Emulator::writeIOMemory(const BYTE& address, const BYTE& data)
 
     switch (address)
     {
-        case 0xBE: m_graphicsChip.WriteDataPort(data); break;
+        case 0xBE: m_graphicsChip.writeDataPort(data); break;
         case 0xBF: 
         {
 //          char buffer[0x200];
 //          sprintf(buffer, "PC is %x", context->m_ProgramCounterStart);
 //          LogMessage::GetSingleton()->DoLogMessage(buffer, false);
-            m_graphicsChip.WriteVDPAddress(data);
+            m_graphicsChip.writeVDPAddress(data);
         }break;
         case 0xBD: 
             {
 //              char buffer[0x200];
 //              sprintf(buffer, "PC is %x", context->m_ProgramCounterStart);
 //              LogMessage::GetSingleton()->DoLogMessage(buffer, false);
-                m_graphicsChip.WriteVDPAddress(data);
+                m_graphicsChip.writeVDPAddress(data);
             }
             break;
         default:  break;
@@ -505,7 +505,7 @@ void Emulator::checkInterupts()
         context->m_ProgramCounter = 0x66;
     }
 
-    if (m_graphicsChip.IsRequestingInterupt())
+    if (m_graphicsChip.isRequestingInterupt())
     {
         m_Z80.IncreaseRReg();
         CONTEXTZ80* context = m_Z80.GetContext();
