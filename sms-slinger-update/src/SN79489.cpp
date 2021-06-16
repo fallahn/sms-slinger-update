@@ -310,7 +310,7 @@ void SN79489::Update(float cyclesMac)
             if (m_Polarity[TONES_NOISE] == 1)
             {
                 bool isWhiteNoise = TestBit(m_Tones[TONES_NOISE], 2);
-                BYTE tappedBits = BitGetVal(m_Tones[TONES_NOISE], 0);
+                BYTE tappedBits = static_cast<BYTE>(BitGetVal(m_Tones[TONES_NOISE], 0));
                 tappedBits |= (BitGetVal(m_Tones[TONES_NOISE], 3) << 3);
                 
                 m_LFSR = (m_LFSR>>1) | ((isWhiteNoise ? parity(m_LFSR & tappedBits) : (m_LFSR & 1)) << 15);

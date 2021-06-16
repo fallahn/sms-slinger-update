@@ -30,62 +30,60 @@
 #include "SN79489.hpp"
 
 #include <memory>
+#include <array>
 
 class Emulator
 {
 public:
     Emulator();
 
-    static  Emulator* CreateInstance();
-    static  Emulator* GetSingleton();
+    static Emulator* createInstance();
+    static Emulator* getSingleton();
 
-    void                Reset();
-    void                InsertCartridge(const char* path);
-    void                Update();
+    void reset();
+    void insertCartridge(const char* path);
+    void update();
 
-    BYTE                ReadMemory(const WORD& address);
-    void                WriteMemory(const WORD& address, const BYTE& data);
-    BYTE                ReadIOMemory(const BYTE& address);
-    void                WriteIOMemory(const BYTE& address, const BYTE& data);
-    TMS9918A&           GetGraphicChip() { return m_GraphicsChip; }
+    BYTE readMemory(const WORD& address);
+    void writeMemory(const WORD& address, const BYTE& data);
+    BYTE readIOMemory(const BYTE& address);
+    void writeIOMemory(const BYTE& address, const BYTE& data);
+    TMS9918A& getGraphicChip() { return m_graphicsChip; }
 
-    void                SetKeyPressed(int player, int key);
-    void                SetKeyReleased(int player, int key);
-    void                ResetButton();
-    void                DumpClockInfo();
-    void                SetGFXOpt(bool useGFXOpt) { m_GraphicsChip.SetGFXOpt(useGFXOpt); }
-    void                CheckInterupts();
+    void setKeyPressed(int player, int key);
+    void setKeyReleased(int player, int key);
+    void resetButton();
+    void dumpClockInfo();
+    void setGFXOpt(bool useGFXOpt) { m_graphicsChip.SetGFXOpt(useGFXOpt); }
+    void checkInterupts();
 
 
-    static   constexpr  long long   MACHINE_CLICKS = 10738635;
-    static   constexpr  int         CPU_CYCLES_TO_MACHINE_CLICKS = 3;
+    static constexpr long long MACHINE_CLICKS = 10738635;
+    static constexpr int CPU_CYCLES_TO_MACHINE_CLICKS = 3;
 
 private:
-    static      std::unique_ptr<Emulator> m_Instance;
+    static std::unique_ptr<Emulator> m_instance;
 
-    bool                IsPAL() const;
-    bool                IsCodeMasters();
-    void                DoMemPage(WORD address, BYTE data);
-    void                DoMemPageCM(WORD address, BYTE data);
+    unsigned long int m_cyclesThisUpdate;
+    int m_FPS;
+    TMS9918A m_graphicsChip;
+    SN79489 m_soundChip;
 
+    Z80 m_Z80;
 
-    unsigned long int   m_CyclesThisUpdate;
-    int                 m_FPS;
-    TMS9918A            m_GraphicsChip;
-    SN79489             m_SoundChip;
+    BYTE m_ramBank[0x2][0x4000];
 
-    Z80                 m_Z80;
+    std::array<BYTE, 2u> m_keyboardPorts = {};
+    bool m_isPAL;
+    bool m_isCodeMasters;
+    bool m_oneMegCartridge;
+    unsigned long int m_clockInfo;
+    BYTE m_firstBankPage;
+    BYTE m_secondBankPage;
+    BYTE m_thirdBankPage;
+    int m_currentRam;
 
-    BYTE                m_RamBank[0x2][0x4000];
-
-    BYTE                m_KeyboardPort1;
-    BYTE                m_KeyboardPort2;
-    bool                m_IsPAL;
-    bool                m_IsCodeMasters;
-    bool                m_OneMegCartridge;
-    unsigned long int   m_ClockInfo;
-    BYTE                m_FirstBankPage;
-    BYTE                m_SecondBankPage;
-    BYTE                m_ThirdBankPage;
-    int                 m_CurrentRam;
+    bool isCodeMasters();
+    void doMemPage(WORD address, BYTE data);
+    void doMemPageCM(WORD address, BYTE data);
 };

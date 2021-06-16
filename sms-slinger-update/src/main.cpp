@@ -27,11 +27,11 @@
 
 int main (int argsc, char** argsv)
 {
-    MasterSystem* sms = MasterSystem::CreateInstance();
-    sms->CreateSDLWindow();
-    //sms->StartRom("roms/lander2_v0C.sms");
-    sms->StartRom("roms/cb01f.sms");
-    sms->BeginGame(60, false);
+    MasterSystem* sms = MasterSystem::createInstance();
+    sms->createSDLWindow();
+    //sms->startRom("roms/lander2_v0C.sms");
+    sms->startRom("roms/cb01f.sms");
+    sms->beginGame(60);
     
     return 0;
 }

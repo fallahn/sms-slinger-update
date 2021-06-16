@@ -32,80 +32,75 @@
 #include <cassert>
 #include <cstring>
 
-///////////////////////////////////////////////////////////////////////////////////
-
-std::unique_ptr<Emulator> Emulator::m_Instance;
-
-Emulator* Emulator::CreateInstance()
+namespace
 {
-    if (m_Instance == nullptr)
+    BYTE readByte(WORD address)
     {
-        m_Instance = std::make_unique<Emulator>();
+        return Emulator::getSingleton()->readMemory(address);
     }
-    return m_Instance.get();
-}
 
-///////////////////////////////////////////////////////////////////////////////////
-
-Emulator* Emulator::GetSingleton()
-{
-    if (m_Instance == nullptr)
+    void writeByte(WORD address, BYTE data)
     {
-        LogMessage::GetSingleton()->DoLogMessage("Trying to get the singleton of Emulator when m_Instance is NULL", true);
-        assert(false);
+        Emulator::getSingleton()->writeMemory(address, data);
     }
-    return m_Instance.get();
+
+    BYTE readIOByte(BYTE address)
+    {
+        return Emulator::getSingleton()->readIOMemory(address);
+    }
+
+    void writeIOByte(BYTE address, BYTE data)
+    {
+        Emulator::getSingleton()->writeIOMemory(address, data);
+    }
 }
 
-///////////////////////////////////////////////////////////////////////////////////
-
-BYTE ReadByte(WORD address)
-{
-    return Emulator::GetSingleton()->ReadMemory(address);
-}
-
-///////////////////////////////////////////////////////////////////////////////////
-
-void WriteByte(WORD address, BYTE data)
-{
-    Emulator::GetSingleton()->WriteMemory(address,data);
-}
-
-///////////////////////////////////////////////////////////////////////////////////
-
-BYTE ReadIOByte(BYTE address)
-{
-    return Emulator::GetSingleton()->ReadIOMemory(address);
-}
-
-///////////////////////////////////////////////////////////////////////////////////
-
-void WriteIOByte(BYTE address, BYTE data)
-{
-    Emulator::GetSingleton()->WriteIOMemory(address,data);
-}
-
-///////////////////////////////////////////////////////////////////////////////////
+std::unique_ptr<Emulator> Emulator::m_instance;
 
 Emulator::Emulator()
-    : m_FPS         (60),
-    m_IsPAL         (false),
-    m_IsCodeMasters (false)
+    : m_cyclesThisUpdate(0),
+    m_FPS               (60),
+    m_isPAL             (false),
+    m_isCodeMasters     (false),
+    m_oneMegCartridge   (false),
+    m_clockInfo         (0),
+    m_firstBankPage     (0),
+    m_secondBankPage    (0),
+    m_thirdBankPage     (0),
+    m_currentRam        (0)
 {
-    Reset();
+    reset();
 }
 
-///////////////////////////////////////////////////////////////////////////////////
-
-void Emulator::Reset()
+//public
+Emulator* Emulator::createInstance()
 {
-    m_ClockInfo = 0;
+    if (m_instance == nullptr)
+    {
+        m_instance = std::make_unique<Emulator>();
+    }
+    return m_instance.get();
+}
+
+Emulator* Emulator::getSingleton()
+{
+    if (m_instance == nullptr)
+    {
+        LogMessage::GetSingleton()->DoLogMessage("Trying to get the singleton of Emulator when m_instance is NULL", true);
+        assert(false);
+    }
+    return m_instance.get();
+}
+
+void Emulator::reset()
+{
+    m_clockInfo = 0;
 
     CONTEXTZ80* context = m_Z80.GetContext();
-    std::memset(&context->m_CartridgeMemory,0,sizeof(context->m_CartridgeMemory));
-    std::memset(&context->m_InternalMemory,0,sizeof(context->m_InternalMemory));
+    std::memset(&context->m_CartridgeMemory, 0, sizeof(context->m_CartridgeMemory));
+    std::memset(&context->m_InternalMemory, 0, sizeof(context->m_InternalMemory));
    
-    std::memset(&m_RamBank,0, sizeof(m_RamBank));
+    std::memset(&m_ramBank, 0, sizeof(m_ramBank));
 
     // these may have to be set to none 0 values so for now i'll set them to all
     // 0 instead of doing a memset so it becomes easier to edit later if necessary
@@ -127,10 +122,10 @@ void Emulator::Reset()
     context->m_StackPointer.reg = 0xDFF0;
     context->m_InternalMemory[0xFFFF] = 2; // official sega doc
     context->m_InternalMemory[0xFFFE] = 1; // official sega doc
-    context->m_FuncPtrRead = &ReadByte;
-    context->m_FuncPtrWrite = &WriteByte;
-    context->m_FuncPtrIORead = &ReadIOByte;
-    context->m_FuncPtrIOWrite = &WriteIOByte;
+    context->m_FuncPtrRead = &readByte;
+    context->m_FuncPtrWrite = &writeByte;
+    context->m_FuncPtrIORead = &readIOByte;
+    context->m_FuncPtrIOWrite = &writeIOByte;
     context->m_IFF1 = false;
     context->m_IFF2 = false;
     context->m_Halted = false;
@@ -139,19 +134,16 @@ void Emulator::Reset()
     context->m_NMIServicing = false;
     context->m_EIPending = false;
 
-    m_KeyboardPort1 = 0xFF;
-    m_KeyboardPort2 = 0xFF;
+    std::fill(m_keyboardPorts.begin(), m_keyboardPorts.end(), 0xFF);
 
-    m_CyclesThisUpdate = 0;
-    m_OneMegCartridge = false;
-    m_CurrentRam = -1;
+    m_cyclesThisUpdate = 0;
+    m_oneMegCartridge = false;
+    m_currentRam = -1;
 
-    m_SoundChip.Reset();
+    m_soundChip.Reset();
 }
 
-///////////////////////////////////////////////////////////////////////////////////
-
-void Emulator::InsertCartridge(const char* path)
+void Emulator::insertCartridge(const char* path)
 {
     CONTEXTZ80* context = m_Z80.GetContext();
 
@@ -184,45 +176,43 @@ void Emulator::InsertCartridge(const char* path)
     }
 
     size_t size = fread(context->m_CartridgeMemory, 1, 0x100000, in);
-    m_OneMegCartridge = (endPos > 0x80000)?true:false;
+    m_oneMegCartridge = (endPos > 0x80000)?true:false;
     
     std::memcpy(&context->m_InternalMemory[0x0], &context->m_CartridgeMemory[0x0], 0xC000);
 
     context->m_InternalMemory[0xFFFE] = 0x01;
     context->m_InternalMemory[0xFFFF] = 0x02;
 
-    m_FirstBankPage = 0;
-    m_SecondBankPage = 1;
-    m_ThirdBankPage = 2;
+    m_firstBankPage = 0;
+    m_secondBankPage = 1;
+    m_thirdBankPage = 2;
 
-    m_IsPAL = false;
-    m_GraphicsChip.Reset(IsPAL());
-    m_FPS = IsPAL() ? 50 : 60;
-    m_IsCodeMasters = IsCodeMasters();
+    m_isPAL = false;
+    m_graphicsChip.Reset(m_isPAL);
+    m_FPS = m_isPAL ? 50 : 60;
+    m_isCodeMasters = isCodeMasters();
 
 
     BYTE a0 = context->m_InternalMemory[0x99];
 
     // codemasters games are initialized with banks 0,1,0 in slots 0,1,2
-    if (m_IsCodeMasters)
+    if (m_isCodeMasters)
     {
-        DoMemPageCM(0x0,0);
-        DoMemPageCM(0x4000,1);
-        DoMemPageCM(0x8000,0);
+        doMemPageCM(0x0,0);
+        doMemPageCM(0x4000,1);
+        doMemPageCM(0x8000,0);
     }
 }
 
-///////////////////////////////////////////////////////////////////////////////////
-
-void Emulator::Update()
+void Emulator::update()
 {
     unsigned long int targetCPU = MACHINE_CLICKS;
     targetCPU /= m_FPS;
 
-    m_CyclesThisUpdate = 0;
-    m_GraphicsChip.ResetScreen();
-    while (!m_GraphicsChip.GetRefresh())
-    //while (m_CyclesThisUpdate < targetCPU)
+    m_cyclesThisUpdate = 0;
+    m_graphicsChip.ResetScreen();
+    while (!m_graphicsChip.GetRefresh())
+    //while (m_cyclesThisUpdate < targetCPU)
     { 
         int cycles = 0;
         if (m_Z80.GetContext()->m_Halted)
@@ -233,7 +223,7 @@ void Emulator::Update()
         {
             cycles = m_Z80.ExecuteNextOpcode();
         }
-        CheckInterupts();
+        checkInterupts();
         
         //http://www.smspower.org/forums/viewtopic.php?p=44198      
                 
@@ -241,61 +231,25 @@ void Emulator::Update()
         // FIX ME! THIS SHOULD BE * 3, not * 2. HOWEVER WITH * 3 SOME GAMES FEEL REALLY CRAP AND SLOW
         // I BELIEVE ITS A VSYNC INTERRUPT ISSUE
 
-        //potentially related to the (fixed) typo in TMS9918A::GetHCount()? M
+        //potentially related to the (fixed) typo in TMS9918A::GetHCount()? - M
         //cycles *= 2;
         cycles *= 3;
 
-        m_CyclesThisUpdate += cycles;
-        m_ClockInfo += cycles;
+        m_cyclesThisUpdate += cycles;
+        m_clockInfo += cycles;
 
         // graphics chips clock is half of that of the sms machine clock
         float vdpClock = static_cast<float>(cycles);
         vdpClock /= 2;
-        m_GraphicsChip.Update(vdpClock);
+        m_graphicsChip.Update(vdpClock);
 
         float soundCycles = static_cast<float>(cycles);
         soundCycles /= CPU_CYCLES_TO_MACHINE_CLICKS;
-        m_SoundChip.Update(soundCycles);       
+        m_soundChip.Update(soundCycles);       
     }
 }
 
-
-///////////////////////////////////////////////////////////////////////////////////
-
-void Emulator::CheckInterupts()
-{
-    if  (m_Z80.GetContext()->m_NMI && (m_Z80.GetContext()->m_NMIServicing == false))
-    {
-        m_Z80.IncreaseRReg();
-        m_Z80.GetContext()->m_NMIServicing = true;
-        m_Z80.GetContext()->m_NMI = false;
-
-        CONTEXTZ80* context = m_Z80.GetContext();
-        context->m_IFF1 = false;
-        context->m_Halted = false;
-        m_Z80.PushWordOntoStack(context->m_ProgramCounter);
-        context->m_ProgramCounter = 0x66;
-    }
-
-    if (m_GraphicsChip.IsRequestingInterupt())
-    {
-        m_Z80.IncreaseRReg();
-        CONTEXTZ80* context = m_Z80.GetContext();
-        if (context->m_IFF1 && context->m_InteruptMode == 1)
-        {
-            context->m_Halted = false;
-
-            m_Z80.PushWordOntoStack(context->m_ProgramCounter);
-            context->m_ProgramCounter = 0x38;
-            context->m_IFF1 = false;
-            context->m_IFF2 = false;
-        }
-    }
-}
-
-///////////////////////////////////////////////////////////////////////////////////
-
-BYTE Emulator::ReadMemory(const WORD& address)
+BYTE Emulator::readMemory(const WORD& address)
 {
     CONTEXTZ80* context = m_Z80.GetContext();
     WORD addr = address;
@@ -306,20 +260,20 @@ BYTE Emulator::ReadMemory(const WORD& address)
     }
 
     // the fixed memory address
-    if (!m_IsCodeMasters && (addr < 0x400))
+    if (!m_isCodeMasters && (addr < 0x400))
     {
         return context->m_InternalMemory[addr];
     }
     // bank 0
     else if (addr < 0x4000)
     {
-        unsigned int bankaddr = addr + (0x4000 * m_FirstBankPage);
+        unsigned int bankaddr = addr + (0x4000 * m_firstBankPage);
         return context->m_CartridgeMemory[bankaddr];
     }
     // bank 1
     else if (addr < 0x8000)
     {
-        unsigned int bankaddr = addr + (0x4000 * m_SecondBankPage);
+        unsigned int bankaddr = addr + (0x4000 * m_secondBankPage);
         bankaddr-=0x4000;
         return context->m_CartridgeMemory[bankaddr];
     }
@@ -327,13 +281,13 @@ BYTE Emulator::ReadMemory(const WORD& address)
     else if (addr < 0xC000)
     {
         // is ram banking mapped in this slot?
-        if (m_CurrentRam > -1)
+        if (m_currentRam > -1)
         {
-            return m_RamBank[m_CurrentRam][addr-0x8000];
+            return m_ramBank[m_currentRam][addr-0x8000];
         }
         else
         {
-            unsigned int bankaddr = addr + (0x4000 * m_ThirdBankPage);
+            unsigned int bankaddr = addr + (0x4000 * m_thirdBankPage);
             bankaddr-=0x8000;
             return context->m_CartridgeMemory[bankaddr];
         }
@@ -342,25 +296,23 @@ BYTE Emulator::ReadMemory(const WORD& address)
     return context->m_InternalMemory[addr];
 }
 
-///////////////////////////////////////////////////////////////////////////////////
-
-void Emulator::WriteMemory(const WORD& address, const BYTE& data)
+void Emulator::writeMemory(const WORD& address, const BYTE& data)
 {
     CONTEXTZ80* context = m_Z80.GetContext();
 
-    if (m_IsCodeMasters)
+    if (m_isCodeMasters)
     {
         if (address == 0x0)
         {
-            DoMemPageCM(address,data);
+            doMemPageCM(address,data);
         }
         else if (address == 0x4000)
         {
-            DoMemPageCM(address,data);
+            doMemPageCM(address,data);
         }
         else if (address == 0x8000)
         {
-            DoMemPageCM(address,data);
+            doMemPageCM(address,data);
         }
     }
 
@@ -374,9 +326,9 @@ void Emulator::WriteMemory(const WORD& address, const BYTE& data)
     else if (address < 0xC000)
     {
         BYTE controlMap = context->m_InternalMemory[0xFFFC];
-        if (m_CurrentRam > -1)
+        if (m_currentRam > -1)
         {
-            m_RamBank[m_CurrentRam][address-0x8000] = data;
+            m_ramBank[m_currentRam][address-0x8000] = data;
             return;
         }
         else
@@ -390,9 +342,9 @@ void Emulator::WriteMemory(const WORD& address, const BYTE& data)
 
     if (address >= 0xFFFC)
     {
-        if (!m_IsCodeMasters)
+        if (!m_isCodeMasters)
         {
-            DoMemPage(address, data);
+            doMemPage(address, data);
         }
     }
 
@@ -409,10 +361,189 @@ void Emulator::WriteMemory(const WORD& address, const BYTE& data)
     }
 }
 
+BYTE Emulator::readIOMemory(const BYTE& address)
+{
+    CONTEXTZ80* context = m_Z80.GetContext();
 
-///////////////////////////////////////////////////////////////////////////////////
+    if (address < 0x40)
+    {
+        return 0xFF;
+    }
 
-void Emulator::DoMemPageCM(WORD address, BYTE data)
+    if ((address >= 0x40) && (address <= 0x7F))
+    {
+        // even addresses are v counter, odd are h counter
+        if ((address % 2)== 0)
+        {
+            return m_graphicsChip.GetVCounter();
+        }
+        return 0; // h counter
+    }
+
+    if ((address >= 0x80) && (address <= 0xBF))
+    {
+        //Even locations are data port, odd locations are control port.
+        if ((address % 2)== 0)
+        {
+            return m_graphicsChip.ReadDataPort();
+        }
+        return m_graphicsChip.GetStatus();    
+    }
+
+    switch (address)
+    {
+        case 0xBE: return m_graphicsChip.ReadDataPort(); break;
+        case 0xBF: return m_graphicsChip.GetStatus(); break;
+        case 0xBD: return m_graphicsChip.GetStatus(); break; // mirror of 0xBF
+        case 0x7F: return m_graphicsChip.GetHCounter() ; break; // hblank
+        case 0x7E: return m_graphicsChip.GetVCounter(); break; 
+        case 0xDC: return m_keyboardPorts[0]; break;
+        case 0xC0: return m_keyboardPorts[0]; break; // mirror of 0xDC
+        case 0xDD: return m_keyboardPorts[1]; break;
+        case 0xC1: return m_keyboardPorts[1]; break; // mirror of 0xDD
+
+        default: return 0xFF; break;
+    }
+}
+
+void Emulator::writeIOMemory(const BYTE& address, const BYTE& data)
+{
+    CONTEXTZ80* context = m_Z80.GetContext();
+
+    if (address < 0x40)
+    {
+        return;
+    }
+
+    if ((address >=0x40) && (address < 0x80))
+    {
+        // sound
+        m_soundChip.WriteData(m_cyclesThisUpdate , data);
+        return;
+    }
+
+    switch (address)
+    {
+        case 0xBE: m_graphicsChip.WriteDataPort(data); break;
+        case 0xBF: 
+        {
+//          char buffer[0x200];
+//          sprintf(buffer, "PC is %x", context->m_ProgramCounterStart);
+//          LogMessage::GetSingleton()->DoLogMessage(buffer, false);
+            m_graphicsChip.WriteVDPAddress(data);
+        }break;
+        case 0xBD: 
+            {
+//              char buffer[0x200];
+//              sprintf(buffer, "PC is %x", context->m_ProgramCounterStart);
+//              LogMessage::GetSingleton()->DoLogMessage(buffer, false);
+                m_graphicsChip.WriteVDPAddress(data);
+            }
+            break;
+        default:  break;
+    }
+}
+
+void Emulator::setKeyPressed(int player, int key)
+{
+    assert(player < 2);
+    BYTE& port = m_keyboardPorts[player];
+    port = BitReset(port, key);
+}
+
+void Emulator::setKeyReleased(int player, int key)
+{
+    assert(player < 2);
+    BYTE& port = m_keyboardPorts[player];
+    port = BitSet(port, key);
+}
+
+void Emulator::resetButton()
+{
+    CONTEXTZ80* context = m_Z80.GetContext();
+
+    if (!context->m_NMIServicing)
+    {
+        context->m_NMI = true;
+    }
+
+    setKeyPressed(1, 4);
+}
+
+void Emulator::dumpClockInfo()
+{
+//  return;
+//  DWORD tickCount = GetTickCount();
+// 
+//  char buffer[255];
+//  memset(buffer,0,sizeof(buffer));
+//  sprintf(buffer, "Tick Count is %lu", tickCount);
+//  LogMessage::GetSingleton()->DoLogMessage(buffer, true);
+// 
+//  memset(buffer,0,sizeof(buffer));
+//  sprintf(buffer, "Machine Clicks Per Second: %lu", m_clockInfo);
+//  LogMessage::GetSingleton()->DoLogMessage(buffer, true);
+// 
+//  m_graphicsChip.DumpClockInfo();
+//  m_soundChip.DumpClockInfo();
+
+    m_clockInfo = 0;
+}
+
+void Emulator::checkInterupts()
+{
+    if  (m_Z80.GetContext()->m_NMI && (m_Z80.GetContext()->m_NMIServicing == false))
+    {
+        m_Z80.IncreaseRReg();
+        m_Z80.GetContext()->m_NMIServicing = true;
+        m_Z80.GetContext()->m_NMI = false;
+
+        CONTEXTZ80* context = m_Z80.GetContext();
+        context->m_IFF1 = false;
+        context->m_Halted = false;
+        m_Z80.PushWordOntoStack(context->m_ProgramCounter);
+        context->m_ProgramCounter = 0x66;
+    }
+
+    if (m_graphicsChip.IsRequestingInterupt())
+    {
+        m_Z80.IncreaseRReg();
+        CONTEXTZ80* context = m_Z80.GetContext();
+        if (context->m_IFF1 && context->m_InteruptMode == 1)
+        {
+            context->m_Halted = false;
+
+            m_Z80.PushWordOntoStack(context->m_ProgramCounter);
+            context->m_ProgramCounter = 0x38;
+            context->m_IFF1 = false;
+            context->m_IFF2 = false;
+        }
+    }
+}
+
+//private
+bool Emulator::isCodeMasters()
+{
+    // a code masters rom header has a checksum. So if the checksum is correct it must be a code masters game
+    CONTEXTZ80* context = m_Z80.GetContext();
+
+    WORD checksum = context->m_InternalMemory[0x7fe7] << 8;
+    checksum |= context->m_InternalMemory[0x7fe6];
+
+    if (checksum == 0x0)
+    {
+        return false;
+    }
+
+    WORD compute = 0x10000 - checksum;
+
+    WORD answer = context->m_InternalMemory[0x7fe9] << 8;
+    answer |= context->m_InternalMemory[0x7fe8];
+
+    return (compute == answer);
+}
+
+void Emulator::doMemPageCM(WORD address, BYTE data)
 {
     CONTEXTZ80* context = m_Z80.GetContext();
     BYTE page = BitReset(data, 7);
@@ -421,15 +552,13 @@ void Emulator::DoMemPageCM(WORD address, BYTE data)
 
     switch(address)
     {
-        case 0x0: m_FirstBankPage = page; break; //memcpy(&context->m_InternalMemory[0x0], &context->m_CartridgeMemory[(0x4000*page)], 0x4000); break;
-        case 0x4000: m_SecondBankPage = page; break;//memcpy(&context->m_InternalMemory[0x4000], &context->m_CartridgeMemory[(0x4000*page)], 0x4000); break;
-        case 0x8000: m_ThirdBankPage = page; break;//memcpy(&context->m_InternalMemory[0x8000], &context->m_CartridgeMemory[(0x4000*page)], 0x4000); break;
+        case 0x0: m_firstBankPage = page; break; //memcpy(&context->m_InternalMemory[0x0], &context->m_CartridgeMemory[(0x4000*page)], 0x4000); break;
+        case 0x4000: m_secondBankPage = page; break;//memcpy(&context->m_InternalMemory[0x4000], &context->m_CartridgeMemory[(0x4000*page)], 0x4000); break;
+        case 0x8000: m_thirdBankPage = page; break;//memcpy(&context->m_InternalMemory[0x8000], &context->m_CartridgeMemory[(0x4000*page)], 0x4000); break;
     }
 }
 
-///////////////////////////////////////////////////////////////////////////////////
-
-void Emulator::DoMemPage(WORD address, BYTE data)
+void Emulator::doMemPage(WORD address, BYTE data)
 {
     CONTEXTZ80* context = m_Z80.GetContext();
 
@@ -437,7 +566,7 @@ void Emulator::DoMemPage(WORD address, BYTE data)
     if (address >= 0xFFFC)
     {
         // I think the seventh bit is never used in page mirroring.
-        BYTE page = m_OneMegCartridge ? (data & 0x3F) : (data & 0x1F);
+        BYTE page = m_oneMegCartridge ? (data & 0x3F) : (data & 0x1F);
 
         context->m_InternalMemory[address-0x2000] = data; // ram mirror
 
@@ -460,16 +589,16 @@ void Emulator::DoMemPage(WORD address, BYTE data)
 
                     if (secondBank)
                     {
-                        m_CurrentRam = 1;//memcpy(&context->m_InternalMemory[0x8000], &m_RamBank[1], 0x4000);
+                        m_currentRam = 1;//memcpy(&context->m_InternalMemory[0x8000], &m_ramBank[1], 0x4000);
                     }
                     else
                     {
-                        m_CurrentRam = 0;//memcpy(&context->m_InternalMemory[0x8000], &m_RamBank[0], 0x4000);
+                        m_currentRam = 0;//memcpy(&context->m_InternalMemory[0x8000], &m_ramBank[0], 0x4000);
                     }
                 }
                 else
                 {
-                    m_CurrentRam = -1;
+                    m_currentRam = -1;
                 }
 
                 // apparently no games use ram banking in address 0xC000
@@ -477,15 +606,15 @@ void Emulator::DoMemPage(WORD address, BYTE data)
             }
             break;
 
-            case 0xFFFD: m_FirstBankPage = page; break;// memcpy(&context->m_InternalMemory[0x400], &context->m_CartridgeMemory[(0x4000*page)+0x400], 0x3C00); break;
+            case 0xFFFD: m_firstBankPage = page; break;// memcpy(&context->m_InternalMemory[0x400], &context->m_CartridgeMemory[(0x4000*page)+0x400], 0x3C00); break;
     
-            case 0xFFFE: m_SecondBankPage = page; break; // memcpy(&context->m_InternalMemory[0x4000], &context->m_CartridgeMemory[0x4000*page], 0x4000);break;
+            case 0xFFFE: m_secondBankPage = page; break; // memcpy(&context->m_InternalMemory[0x4000], &context->m_CartridgeMemory[0x4000*page], 0x4000);break;
             case 0xFFFF:
             {
                 // only allow rom banking in slot 2 if ram is not mapped there!
                 if (false == TestBit(context->m_InternalMemory[0xFFFC],3))
                 {
-                    m_ThirdBankPage = page;
+                    m_thirdBankPage = page;
                     //memcpy(&context->m_InternalMemory[0x8000], &context->m_CartridgeMemory[0x4000*page], 0x4000);
                 }
             }
@@ -493,174 +622,3 @@ void Emulator::DoMemPage(WORD address, BYTE data)
         }
     }
 }
-
-///////////////////////////////////////////////////////////////////////////////////
-
-BYTE Emulator::ReadIOMemory(const BYTE& address)
-{
-    CONTEXTZ80* context = m_Z80.GetContext();
-
-    if (address < 0x40)
-    {
-        return 0xFF;
-    }
-
-    if ((address >= 0x40) && (address <= 0x7F))
-    {
-        // even addresses are v counter, odd are h counter
-        if ((address % 2)== 0)
-        {
-            return m_GraphicsChip.GetVCounter();
-        }
-        return 0; // h counter
-    }
-
-    if ((address >= 0x80) && (address <= 0xBF))
-    {
-        //Even locations are data port, odd locations are control port.
-        if ((address % 2)== 0)
-        {
-            return m_GraphicsChip.ReadDataPort();
-        }
-        return m_GraphicsChip.GetStatus();    
-    }
-
-    switch (address)
-    {
-        case 0xBE: return m_GraphicsChip.ReadDataPort(); break;
-        case 0xBF: return m_GraphicsChip.GetStatus(); break;
-        case 0xBD: return m_GraphicsChip.GetStatus(); break; // mirror of 0xBF
-        case 0x7F: return m_GraphicsChip.GetHCounter() ; break; // hblank
-        case 0x7E: return m_GraphicsChip.GetVCounter(); break; 
-        case 0xDC: return m_KeyboardPort1; break;
-        case 0xC0: return m_KeyboardPort1; break; // mirror of 0xDC
-        case 0xDD: return m_KeyboardPort2; break;
-        case 0xC1: return m_KeyboardPort2; break; // mirror of 0xDD
-
-        default: return 0xFF; break;
-    }
-}
-
-///////////////////////////////////////////////////////////////////////////////////
-
-void Emulator::WriteIOMemory(const BYTE& address, const BYTE& data)
-{
-    CONTEXTZ80* context = m_Z80.GetContext();
-
-    if (address < 0x40)
-    {
-        return;
-    }
-
-    if ((address >=0x40) && (address < 0x80))
-    {
-        // sound
-        m_SoundChip.WriteData(m_CyclesThisUpdate , data);
-        return;
-    }
-
-    switch (address)
-    {
-        case 0xBE: m_GraphicsChip.WriteDataPort(data); break;
-        case 0xBF: 
-        {
-//          char buffer[0x200];
-//          sprintf(buffer, "PC is %x", context->m_ProgramCounterStart);
-//          LogMessage::GetSingleton()->DoLogMessage(buffer, false);
-            m_GraphicsChip.WriteVDPAddress(data);
-        }break;
-        case 0xBD: 
-            {
-//              char buffer[0x200];
-//              sprintf(buffer, "PC is %x", context->m_ProgramCounterStart);
-//              LogMessage::GetSingleton()->DoLogMessage(buffer, false);
-                m_GraphicsChip.WriteVDPAddress(data);
-            }
-            break;
-        default:  break;
-    }
-}
-
-///////////////////////////////////////////////////////////////////////////////////
-
-bool Emulator::IsPAL() const
-{
-    return m_IsPAL;
-}
-
-///////////////////////////////////////////////////////////////////////////////////
-
-void Emulator::SetKeyPressed(int player, int key)
-{
-    BYTE& port = (player == 1) ? m_KeyboardPort1 : m_KeyboardPort2;
-    port = BitReset(port, key);
-}
-
-///////////////////////////////////////////////////////////////////////////////////
-
-void Emulator::SetKeyReleased(int player, int key)
-{
-    BYTE& port = (player == 1) ? m_KeyboardPort1 : m_KeyboardPort2;
-    port = BitSet(port, key);
-}
-///////////////////////////////////////////////////////////////////////////////////
-
-
-// a code masters rom header has a checksum. So if the checksum is correct it must be a code masters game
-bool Emulator::IsCodeMasters()
-{
-    CONTEXTZ80* context = m_Z80.GetContext();
-
-    WORD checksum = context->m_InternalMemory[0x7fe7] << 8;
-    checksum |= context->m_InternalMemory[0x7fe6];
-
-    if (checksum == 0x0)
-    {
-        return false;
-    }
-
-    WORD compute = 0x10000 - checksum;
-
-    WORD answer = context->m_InternalMemory[0x7fe9] << 8;
-    answer |= context->m_InternalMemory[0x7fe8];
-
-    return (compute == answer);
-}
-
-///////////////////////////////////////////////////////////////////////////////////
-
-void Emulator::ResetButton()
-{
-    CONTEXTZ80* context = m_Z80.GetContext();
-
-    if (!context->m_NMIServicing)
-    {
-        context->m_NMI = true;
-    }
-
-    SetKeyPressed(2, 4);
-}
-
-///////////////////////////////////////////////////////////////////////////////////
-
-void Emulator::DumpClockInfo()
-{
-//  return;
-//  DWORD tickCount = GetTickCount();
-// 
-//  char buffer[255];
-//  memset(buffer,0,sizeof(buffer));
-//  sprintf(buffer, "Tick Count is %u", tickCount);
-//  LogMessage::GetSingleton()->DoLogMessage(buffer, true);
-// 
-//  memset(buffer,0,sizeof(buffer));
-//  sprintf(buffer, "Machine Clicks Per Second: %u", m_ClockInfo);
-//  LogMessage::GetSingleton()->DoLogMessage(buffer, true);
-// 
-//  m_GraphicsChip.DumpClockInfo();
-//  m_SoundChip.DumpClockInfo();
-
-    m_ClockInfo = 0;
-}
-
-///////////////////////////////////////////////////////////////////////////////////

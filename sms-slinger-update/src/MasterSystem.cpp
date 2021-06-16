@@ -38,38 +38,61 @@ namespace
 
     SDL_Window* window = nullptr;
     SDL_GLContext ctx = nullptr;
-}
 
-/////////////////////////////////////////////////////////////////////////
+    //TODO replace this with ImGui
+    unsigned int fpstime = 0;
+    int count = 0;
+    bool first = true;
 
-std::unique_ptr<MasterSystem> MasterSystem::m_Instance;
-
-MasterSystem* MasterSystem::CreateInstance()
-{
-    if (m_Instance == nullptr)
+    bool LogFrameRate()
     {
-        m_Instance = std::make_unique<MasterSystem>();
+        bool res = false;
+        if (first)
+        {
+            first = false;
+            fpstime = SDL_GetTicks();
+        }
+
+        unsigned int fpscurrent = SDL_GetTicks();
+        if ((fpstime + 1000) < fpscurrent)
+        {
+            fpstime = fpscurrent;
+            char buffer[255];
+            sprintf(buffer, "FPS %d", count);
+            count = 0;
+            SDL_SetWindowTitle(window, buffer);
+            res = true;
+        }
+        count++;
+        return res;
     }
-    return m_Instance.get();
 }
 
-/////////////////////////////////////////////////////////////////////////
+std::unique_ptr<MasterSystem> MasterSystem::m_instance;
 
 MasterSystem::MasterSystem()
-    : m_Emulator(nullptr),
-    m_Width     (0),
-    m_Height    (0),
-    m_UseGFXOpt (false)
+    : m_emulator(nullptr),
+    m_width     (0),
+    m_height    (0),
+    m_useGFXOpt (false)
 {
-    m_Emulator = Emulator::CreateInstance();
+    m_emulator = Emulator::createInstance();
 }
 
-/////////////////////////////////////////////////////////////////////////
-
-bool MasterSystem::CreateSDLWindow()
+//public
+MasterSystem* MasterSystem::createInstance()
 {
-    m_Width = WINDOWWIDTH * SCREENSCALE;
-    m_Height = WINDOWHEIGHT * SCREENSCALE;
+    if (m_instance == nullptr)
+    {
+        m_instance = std::make_unique<MasterSystem>();
+    }
+    return m_instance.get();
+}
+
+bool MasterSystem::createSDLWindow()
+{
+    m_width = WINDOWWIDTH * SCREENSCALE;
+    m_height = WINDOWHEIGHT * SCREENSCALE;
     if(SDL_Init(SDL_INIT_EVERYTHING) < 0)
     {
         return false;
@@ -77,7 +100,7 @@ bool MasterSystem::CreateSDLWindow()
 
     window = SDL_CreateWindow("Sega Master System", 
         SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED, 
-        m_Width, m_Height, SDL_WINDOW_SHOWN | SDL_WINDOW_OPENGL);
+        m_width, m_height, SDL_WINDOW_SHOWN | SDL_WINDOW_OPENGL);
     
     if (window == nullptr)
     {
@@ -92,18 +115,35 @@ bool MasterSystem::CreateSDLWindow()
         return false;
     }
 
-    InitGL();
+    initGL();
     return true;
 }
 
-/////////////////////////////////////////////////////////////////////////
-
-void MasterSystem::InitGL()
+void MasterSystem::startRom(const char* path)
 {
-    glViewport(0, 0, m_Width, m_Height);
+    m_emulator->reset();
+    m_emulator->insertCartridge(path);
+}
+
+void MasterSystem::beginGame(int fps, bool useGFXOpt)
+{
+    m_useGFXOpt = useGFXOpt;
+    m_emulator->setGFXOpt(useGFXOpt);
+    romLoop(fps);
+}
+
+unsigned char MasterSystem::getMemoryByte(int i)
+{
+    return m_emulator->readMemory(i);
+}
+
+//private
+void MasterSystem::initGL()
+{
+    glViewport(0, 0, m_width, m_height);
     glMatrixMode(GL_MODELVIEW);
     glLoadIdentity();
-    glOrtho(0, m_Width, m_Height, 0, -1.0, 1.0);
+    glOrtho(0, m_width, m_height, 0, -1.0, 1.0);
     glClearColor(0.f, 0.f, 1.f, 1.f);
     glClear(GL_COLOR_BUFFER_BIT);
     glShadeModel(GL_FLAT);
@@ -115,55 +155,42 @@ void MasterSystem::InitGL()
     glDisable(GL_BLEND);
 }
 
-/////////////////////////////////////////////////////////////////////////
-
-void MasterSystem::StartRom(const char* path)
+void MasterSystem::renderGame()
 {
-    m_Emulator->Reset();
-    m_Emulator->InsertCartridge(path);
-}
-
-/////////////////////////////////////////////////////////////////////////
-
-void MasterSystem::BeginGame(int fps, bool useGFXOpt)
-{
-    m_UseGFXOpt = useGFXOpt;
-    m_Emulator->SetGFXOpt(useGFXOpt);
-    RomLoop(fps);
-}
-
-/////////////////////////////////////////////////////////////////////////
-
-static unsigned int fpstime = 0;
-static int count = 0;
-static bool first = true;
-
-bool LogFrameRate()
-{
-    bool res = false;
-    if (first)
+    if (TMS9918A::m_FrameToggle && !TMS9918A::m_ScreenDisabled)
     {
-        first = false;
-        fpstime = SDL_GetTicks();
-    }
+        int width = SCREENSCALE * m_emulator->getGraphicChip().GetWidth();
+        int height = SCREENSCALE * m_emulator->getGraphicChip().GetHeight();
 
-    unsigned int fpscurrent = SDL_GetTicks();
-    if((fpstime + 1000) < fpscurrent)
-    {
-        fpstime = fpscurrent;
-        char buffer[255];
-        sprintf(buffer, "FPS %d", count);
-        count = 0;
-        SDL_SetWindowTitle(window, buffer);
-        res = true;
+        if (width != m_width || height != m_height)
+        {
+            m_width = width;
+            m_height = height;
+            SDL_SetWindowSize(window, m_width, m_height);
+        }
+
+        glClear(GL_COLOR_BUFFER_BIT);
+        glLoadIdentity();
+        glRasterPos2i(-1, 1);
+        glPixelZoom(1, -1);
+        if (height == SCREENSCALE * TMS9918A::NUM_RES_VERTICAL)
+        {
+            glDrawPixels(m_width, m_height, GL_RGB, GL_UNSIGNED_BYTE, m_emulator->getGraphicChip().m_ScreenStandard);
+        }
+        else if (height == SCREENSCALE * TMS9918A::NUM_RES_VERT_MED)
+        {
+            glDrawPixels(m_width, m_height, GL_RGB, GL_UNSIGNED_BYTE, m_emulator->getGraphicChip().m_ScreenMed);
+        }
+        else if (height == SCREENSCALE * TMS9918A::NUM_RES_VERT_HIGH)
+        {
+            glDrawPixels(m_width, m_height, GL_RGB, GL_UNSIGNED_BYTE, m_emulator->getGraphicChip().m_ScreenHigh);
+        }
+
+        SDL_GL_SwapWindow(window);
     }
-    count++;
-    return res;
 }
 
-/////////////////////////////////////////////////////////////////////////
-
-void MasterSystem::RomLoop(int fps)
+void MasterSystem::romLoop(int fps)
 {
     bool quit = false;
     SDL_Event event;
@@ -181,7 +208,7 @@ void MasterSystem::RomLoop(int fps)
         while(SDL_PollEvent(&event)) 
         {
             if (event.type == SDL_QUIT
-                || HandleInput(event))
+                || handleInput(event))
             {
                 quit = true;
             }
@@ -191,18 +218,18 @@ void MasterSystem::RomLoop(int fps)
 
         if (sync && (time2 + (1000 / fps)) < current)
         {
-            m_Emulator->Update();
-            RenderGame();
+            m_emulator->update();
+            renderGame();
             time2 = current;
             if (LogFrameRate())
             {
-                m_Emulator->DumpClockInfo();
+                m_emulator->dumpClockInfo();
             }
         }
         else if (!sync)
         {
-            m_Emulator->Update();
-            RenderGame();
+            m_emulator->update();
+            renderGame();
             LogFrameRate();
         }
     }
@@ -211,60 +238,13 @@ void MasterSystem::RomLoop(int fps)
     SDL_Quit();
 }
 
-
-/////////////////////////////////////////////////////////////////////////
-
-void MasterSystem::RenderGame()
-{   
-    if (TMS9918A::m_FrameToggle && !TMS9918A::m_ScreenDisabled)
-    {
-        int width = SCREENSCALE * m_Emulator->GetGraphicChip().GetWidth();
-        int height = SCREENSCALE * m_Emulator->GetGraphicChip().GetHeight();
-
-        if (width != m_Width || height != m_Height)
-        {
-            m_Width = width;
-            m_Height = height;
-            SDL_SetWindowSize(window, m_Width, m_Height);
-        }
-
-        glClear(GL_COLOR_BUFFER_BIT);
-        glLoadIdentity();
-        glRasterPos2i(-1, 1);
-        glPixelZoom(1, -1);
-        if (height == SCREENSCALE * TMS9918A::NUM_RES_VERTICAL)
-        {
-            glDrawPixels(m_Width, m_Height, GL_RGB, GL_UNSIGNED_BYTE, m_Emulator->GetGraphicChip().m_ScreenStandard);
-        }
-        else if (height == SCREENSCALE * TMS9918A::NUM_RES_VERT_MED)
-        {
-            glDrawPixels(m_Width, m_Height, GL_RGB, GL_UNSIGNED_BYTE, m_Emulator->GetGraphicChip().m_ScreenMed);
-        }
-        else if (height == SCREENSCALE * TMS9918A::NUM_RES_VERT_HIGH)
-        {
-            glDrawPixels(m_Width, m_Height, GL_RGB, GL_UNSIGNED_BYTE, m_Emulator->GetGraphicChip().m_ScreenHigh);
-        }
-        
-        SDL_GL_SwapWindow(window);
-    }
-}
-
-/////////////////////////////////////////////////////////////////////////
-
-unsigned char MasterSystem::GetMemoryByte(int i)
-{
-    return m_Emulator->ReadMemory(i);
-}
-
-/////////////////////////////////////////////////////////////////////////
-
-bool MasterSystem::HandleInput(const SDL_Event& event)
+bool MasterSystem::handleInput(const SDL_Event& event)
 {
     if(event.type == SDL_KEYDOWN)
     {
         int key = -1;
-        int player = 1;
-        switch(event.key.keysym.sym)
+        int player = 0;
+        switch (event.key.keysym.sym)
         {
         case SDLK_ESCAPE: return true;
 
@@ -274,26 +254,26 @@ bool MasterSystem::HandleInput(const SDL_Event& event)
         case SDLK_LEFT: key = 2; break;
         case SDLK_UP: key = 0; break;
         case SDLK_DOWN: key = 1; break;
-        case SDLK_BACKSPACE: m_Emulator->ResetButton(); break;
+        case SDLK_BACKSPACE: m_emulator->resetButton(); break;
 
-        case SDLK_KP_4: player = 2; key = 0; break; // left
-        case SDLK_KP_6: player = 2; key = 1; break; // right
-        case SDLK_KP_7: player = 2; key = 2; break; // fire a
-        case SDLK_KP_9: player = 2; key = 3; break; // fire b
-        case SDLK_KP_8: player = 1; key = 6; break; // up (although marked as player 1 it is player 2 but using overlapped ports)
-        case SDLK_KP_2: player = 1; key = 7; break; // down (although marked as player 1 it is player 2 but using overlapped ports)
+        case SDLK_KP_4: player = 1; key = 0; break; // left
+        case SDLK_KP_6: player = 1; key = 1; break; // right
+        case SDLK_KP_7: player = 1; key = 2; break; // fire a
+        case SDLK_KP_9: player = 1; key = 3; break; // fire b
+        case SDLK_KP_8: player = 0; key = 6; break; // up (although marked as player 1 it is player 2 but using overlapped ports)
+        case SDLK_KP_2: player = 0; key = 7; break; // down (although marked as player 1 it is player 2 but using overlapped ports)
         default: break;
         }
         if (key != -1)
         {
-            m_Emulator->SetKeyPressed(player, key);
+            m_emulator->setKeyPressed(player, key);
         }
     }
     //If a key was released
     else if(event.type == SDL_KEYUP)
     {
         int key = -1;
-        int player = 1;
+        int player = 0;
         switch(event.key.keysym.sym)
         {
         case SDLK_a: key = 4; break;
@@ -303,21 +283,19 @@ bool MasterSystem::HandleInput(const SDL_Event& event)
         case SDLK_UP: key = 0; break;
         case SDLK_DOWN: key = 1; break;
         case SDLK_BACKSPACE : key = 4; player = 2;break;
-        case SDLK_KP_4: player = 2; key = 0; break; // left
-        case SDLK_KP_6: player = 2; key = 1; break; // right
-        case SDLK_KP_7: player = 2; key = 2; break; // fire a
-        case SDLK_KP_9: player = 2; key = 3; break; // fire b
-        case SDLK_KP_8: player = 1; key = 6; break; // up (although marked as player 1 it is player 2 but using overlapped ports)
-        case SDLK_KP_2: player = 1; key = 7; break; // down (although marked as player 1 it is player 2 but using overlapped ports)
+        case SDLK_KP_4: player = 1; key = 0; break; // left
+        case SDLK_KP_6: player = 1; key = 1; break; // right
+        case SDLK_KP_7: player = 1; key = 2; break; // fire a
+        case SDLK_KP_9: player = 1; key = 3; break; // fire b
+        case SDLK_KP_8: player = 0; key = 6; break; // up (although marked as player 1 it is player 2 but using overlapped ports)
+        case SDLK_KP_2: player = 0; key = 7; break; // down (although marked as player 1 it is player 2 but using overlapped ports)
         default: break;
         }
 
         if (key != -1)
         {
-            m_Emulator->SetKeyReleased(player, key);
+            m_emulator->setKeyReleased(player, key);
         }
     }
     return false;
 }
-
-/////////////////////////////////////////////////////////////////////////

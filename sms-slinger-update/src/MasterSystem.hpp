@@ -31,31 +31,28 @@
 #include <memory>
 
 class Emulator;
-class MasterSystem
+class MasterSystem final
 {
 public:
-                                MasterSystem();
+    MasterSystem();
 
-    static  MasterSystem*       CreateInstance();
+    static MasterSystem* createInstance();
 
-            bool                CreateSDLWindow();
-            void                StartRom(const char* path);
-
-            void                BeginGame(int fps, bool useGfxOpt);
-            unsigned char       GetMemoryByte(int i);
+    bool createSDLWindow();
+    void startRom(const char* path);
+    void beginGame(int fps, bool useGfxOpt = false);
+    unsigned char getMemoryByte(int i);
 
 private:
+    static std::unique_ptr<MasterSystem> m_instance;
 
-            void                InitGL();
-            void                RenderGame();
-            void                RomLoop(int fps);
-            bool                HandleInput(const SDL_Event& event);
-            
+    Emulator* m_emulator;
+    int m_width;
+    int m_height;
+    bool m_useGFXOpt;
 
-    static  std::unique_ptr<MasterSystem>       m_Instance;
-
-            Emulator*           m_Emulator;
-            int                 m_Width;
-            int                 m_Height;
-            bool                m_UseGFXOpt;
+    void initGL();
+    void renderGame();
+    void romLoop(int fps);
+    bool handleInput(const SDL_Event& event);
 };
