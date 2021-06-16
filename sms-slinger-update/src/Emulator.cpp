@@ -175,8 +175,8 @@ void Emulator::insertCartridge(const char* path)
         }
     }
 
-    size_t size = fread(context->m_CartridgeMemory, 1, 0x100000, in);
-    m_oneMegCartridge = (endPos > 0x80000)?true:false;
+    fread(context->m_CartridgeMemory, 1, 0x100000, in);
+    m_oneMegCartridge = (endPos > 0x80000) ? true : false;
     
     std::memcpy(&context->m_InternalMemory[0x0], &context->m_CartridgeMemory[0x0], 0xC000);
 
@@ -192,15 +192,12 @@ void Emulator::insertCartridge(const char* path)
     m_FPS = m_isPAL ? 50 : 60;
     m_isCodeMasters = isCodeMasters();
 
-
-    BYTE a0 = context->m_InternalMemory[0x99];
-
     // codemasters games are initialized with banks 0,1,0 in slots 0,1,2
     if (m_isCodeMasters)
     {
-        doMemPageCM(0x0,0);
-        doMemPageCM(0x4000,1);
-        doMemPageCM(0x8000,0);
+        doMemPageCM(0x0, 0);
+        doMemPageCM(0x4000, 1);
+        doMemPageCM(0x8000, 0);
     }
 }
 
@@ -325,7 +322,6 @@ void Emulator::writeMemory(const WORD& address, const BYTE& data)
     // only allow writing to here if a ram bank is mapped into this slot
     else if (address < 0xC000)
     {
-        BYTE controlMap = context->m_InternalMemory[0xFFFC];
         if (m_currentRam > -1)
         {
             m_ramBank[m_currentRam][address-0x8000] = data;
@@ -363,8 +359,6 @@ void Emulator::writeMemory(const WORD& address, const BYTE& data)
 
 BYTE Emulator::readIOMemory(const BYTE& address)
 {
-    CONTEXTZ80* context = m_Z80.GetContext();
-
     if (address < 0x40)
     {
         return 0xFF;
@@ -373,7 +367,7 @@ BYTE Emulator::readIOMemory(const BYTE& address)
     if ((address >= 0x40) && (address <= 0x7F))
     {
         // even addresses are v counter, odd are h counter
-        if ((address % 2)== 0)
+        if ((address % 2) == 0)
         {
             return m_graphicsChip.getVCounter();
         }
@@ -408,8 +402,6 @@ BYTE Emulator::readIOMemory(const BYTE& address)
 
 void Emulator::writeIOMemory(const BYTE& address, const BYTE& data)
 {
-    CONTEXTZ80* context = m_Z80.GetContext();
-
     if (address < 0x40)
     {
         return;
@@ -545,12 +537,11 @@ bool Emulator::isCodeMasters()
 
 void Emulator::doMemPageCM(WORD address, BYTE data)
 {
-    CONTEXTZ80* context = m_Z80.GetContext();
     BYTE page = bitReset(data, 7);
     page = bitReset(page, 6);
     page = bitReset(page, 5);
 
-    switch(address)
+    switch (address)
     {
         case 0x0: m_firstBankPage = page; break; //memcpy(&context->m_InternalMemory[0x0], &context->m_CartridgeMemory[(0x4000*page)], 0x4000); break;
         case 0x4000: m_secondBankPage = page; break;//memcpy(&context->m_InternalMemory[0x4000], &context->m_CartridgeMemory[(0x4000*page)], 0x4000); break;
