@@ -28,64 +28,78 @@
 #include <SDL2/SDL.h>
 
 #include <vector>
+#include <array>
 #include <cstdint>
 
-class SN79489
+class SN79489 final
 {
 public:
-                                SN79489();
+    SN79489();
 
-            void                WriteData(unsigned long int cycles, BYTE data);
-            void                Reset();
-            void                Update(float cycles);
-            void                DumpClockInfo();
+    void writeData(unsigned long int cycles, BYTE data);
+    void reset();
+    void update(float cycles);
+    void dumpClockInfo();
+
 private:
 
-    enum CHANNEL
+    struct Channel final
     {
-        CHANNEL_ZERO,
-        CHANNEL_ONE,
-        CHANNEL_TWO,
-        CHANNEL_THREE,
-        CHANNEL_NUM
+        enum
+        {
+            Zero,
+            One,
+            Two,
+            Three,
+
+            Count
+        };
     } ;
 
-    enum TONES
+    struct Tones final
     {
-        TONES_ZERO,
-        TONES_ONE,
-        TONES_TWO,
-        TONES_NOISE,
-        TONES_NUM
+        enum
+        {
+            Zero,
+            One,
+            Two,
+            Noise,
+
+            Count
+        };
     };
 
-    enum VOLUME
+    struct Volume final
     {
-        VOLUME_ZERO,
-        VOLUME_ONE,
-        VOLUME_TWO,
-        VOLUME_THREE,
-        VOLUME_NUM
-    };
-    
-    static  void                HandleSDLCallback(void* userData, Uint8* buffer, int len);
-            void                HandleSDLCallback(Uint8* buffer, int len);
-            void                OpenSDLAudioDevice();
+        enum
+        {
+            Zero,
+            One,
+            Two,
+            Three,
 
-            static  constexpr unsigned int  BUFFERSIZE = 8096;
-    static  constexpr int           FREQUENCY = 44100;
-            std::vector<std::int16_t>    m_Buffer;
-            WORD                m_Tones[TONES_NUM];
-            BYTE                m_Volume[VOLUME_NUM];
-            int                 m_Counters[CHANNEL_NUM];
-            int                 m_Polarity[CHANNEL_NUM];
-            CHANNEL             m_LatchedChannel;
-            bool                m_IsToneLatched;
-            int                 m_VolumeTable[16];
-            int                 m_CurrentBufferPos;
-            float               m_Cycles;
-            WORD                m_LFSR;
-            unsigned long int   m_ClockInfo;
-            float               m_BufferUpdateCount;
-            float               m_UpdateBufferLimit;
+            Count
+        };
+    };
+
+    std::vector<std::int16_t> m_buffer;
+
+    std::array<WORD, Tones::Count> m_tones = {};
+    std::array<BYTE, Volume::Count> m_volume = {};
+    std::array<int, Channel::Count> m_counters = {};
+    std::array<int, Channel::Count> m_polarity = {};
+    std::array<int, 16> m_volumeTable = {};
+
+    int m_latchedChannel;
+    bool m_isToneLatched;
+    int m_currentBufferPos;
+    float m_cycles;
+    WORD m_LFSR;
+    unsigned long int m_clockInfo;
+    float m_bufferUpdateCount;
+    float m_updateBufferLimit;
+
+    static void handleSDLCallback(void* userData, Uint8* buffer, int len);
+    void handleSDLCallback(Uint8* buffer, int len);
+    void openSDLAudioDevice();
 };

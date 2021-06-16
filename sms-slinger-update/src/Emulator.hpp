@@ -32,7 +32,7 @@
 #include <memory>
 #include <array>
 
-class Emulator
+class Emulator final
 {
 public:
     Emulator();

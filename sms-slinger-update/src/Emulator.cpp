@@ -140,7 +140,7 @@ void Emulator::reset()
     m_oneMegCartridge = false;
     m_currentRam = -1;
 
-    m_soundChip.Reset();
+    m_soundChip.reset();
 }
 
 void Emulator::insertCartridge(const char* path)
@@ -245,7 +245,7 @@ void Emulator::update()
 
         float soundCycles = static_cast<float>(cycles);
         soundCycles /= CPU_CYCLES_TO_MACHINE_CLICKS;
-        m_soundChip.Update(soundCycles);       
+        m_soundChip.update(soundCycles);       
     }
 }
 
@@ -418,7 +418,7 @@ void Emulator::writeIOMemory(const BYTE& address, const BYTE& data)
     if ((address >=0x40) && (address < 0x80))
     {
         // sound
-        m_soundChip.WriteData(m_cyclesThisUpdate , data);
+        m_soundChip.writeData(m_cyclesThisUpdate , data);
         return;
     }
 

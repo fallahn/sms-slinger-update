@@ -32,18 +32,32 @@
 #include <cstring>
 #include <iostream>
 
-////////////////////////////////////////////////////////////////////
+namespace
+{
+    constexpr unsigned int BUFFERSIZE = 8096;
+    constexpr int FREQUENCY = 44100;
+
+    int parity(BYTE data)
+    {
+        int bitCount = BitCount(data, 4);
+        if ((bitCount % 2) == 0)
+        {
+            return 0;
+        }
+        return 1;
+    }
+}
 
 SN79489::SN79489()
-    : m_Buffer          (BUFFERSIZE),
-    m_LatchedChannel    (CHANNEL::CHANNEL_ZERO),
-    m_IsToneLatched     (false),
-    m_CurrentBufferPos  (0),
-    m_Cycles            (0.f),
+    : m_buffer          (BUFFERSIZE),
+    m_latchedChannel    (Channel::Zero),
+    m_isToneLatched     (false),
+    m_currentBufferPos  (0),
+    m_cycles            (0.f),
     m_LFSR              (0),
-    m_ClockInfo         (0),
-    m_BufferUpdateCount (0.f),
-    m_UpdateBufferLimit (0.f)
+    m_clockInfo         (0),
+    m_bufferUpdateCount (0.f),
+    m_updateBufferLimit (0.f)
 {
     constexpr int maxVolume = 8000; // there are 4 channels and the output is a signed 16 bit num giving a range of -32,000 + 32,000 so 4 * 8000 fits into the range
     constexpr double TwodBScalingFactor = 0.79432823; // each volume setting gets lower by 2 decibels
@@ -52,14 +66,14 @@ SN79489::SN79489()
 
     for (int i = 0; i < 15; ++i)
     {
-        m_VolumeTable[i] = static_cast<int>(vol);
+        m_volumeTable[i] = static_cast<int>(vol);
         vol *= TwodBScalingFactor;
     }
 
     // volume 15 is silent
-    m_VolumeTable[15] = 0;
+    m_volumeTable[15] = 0;
 
-    Reset();
+    reset();
     SDL_PauseAudio(1);
 
     // strange calculation works out how many sound clock cycles is needed before we need to
@@ -74,54 +88,11 @@ SN79489::SN79489()
 
     float updateBufferLimit = clockSpeed / sdlCallbakFreq;
     updateBufferLimit /= BUFFERSIZE; 
-    m_UpdateBufferLimit = updateBufferLimit;
+    m_updateBufferLimit = updateBufferLimit;
 }
 
-////////////////////////////////////////////////////////////////////
-
-void SN79489::Reset()
-{
-    m_BufferUpdateCount = 0;
-    std::fill(m_Buffer.begin(), m_Buffer.end(), 0);
-    //std::memset(m_Buffer, 0, sizeof(m_Buffer));
-    std::memset(m_Tones, 0, sizeof(m_Tones));
-    std::memset(m_Counters, 0, sizeof(m_Counters));
-    m_ClockInfo = 0;
-    
-    for (int i = 0; i < 4; i++)
-    {
-        m_Volume[i] = 0xF;
-        m_Polarity[i] = 1;
-    }
-    m_LatchedChannel = CHANNEL_ZERO;
-    m_IsToneLatched = true;
-    m_CurrentBufferPos = 0;
-    m_Cycles = 0;
-    m_LFSR = 0x8000;
-    SDL_CloseAudio();
-    OpenSDLAudioDevice();
-}
-
-////////////////////////////////////////////////////////////////////
-
-void SN79489::OpenSDLAudioDevice()
-{
-    SDL_AudioSpec as;
-    as.freq = FREQUENCY;
-    as.format = AUDIO_S16SYS;
-    as.channels = 1;
-    as.silence = 0;
-    as.samples = BUFFERSIZE / 4;
-    as.size = 0;
-    as.callback = HandleSDLCallback;
-    as.userdata = this;
-    SDL_OpenAudio(&as, 0);
-    SDL_PauseAudio(0);
-}
-
-////////////////////////////////////////////////////////////////////
-
-void SN79489::WriteData(unsigned long int cycles, BYTE data)
+//public
+void SN79489::writeData(unsigned long int cycles, BYTE data)
 {
     // if bit 7 is set the it updates the latch
     if (TestBit(data, 7))
@@ -132,25 +103,25 @@ void SN79489::WriteData(unsigned long int cycles, BYTE data)
 
         // turn off top bit
         channel &= 0x3;
-        m_LatchedChannel = static_cast<CHANNEL>(channel);
+        m_latchedChannel = channel;
 
         // if bit 4 is set then the channel we're latching volume, otherwise tone
-        m_IsToneLatched = TestBit(data, 4) ? false : true;
+        m_isToneLatched = TestBit(data, 4) ? false : true;
         
         // bottom 4 bits are the data to be updated
         BYTE channelData = data & 0xF;
 
-        if (m_IsToneLatched)
+        if (m_isToneLatched)
         {
-            if (m_LatchedChannel == TONES_NOISE)
+            if (m_latchedChannel == Tones::Noise)
             {
                 // noise register is only 4 bits, so you dont need to keep the top nibble (as there isnt one)
-                m_Tones[TONES_NOISE] = channelData;
+                m_tones[Tones::Noise] = channelData;
                 m_LFSR = 0x8000;
             }
             else
             {
-                WORD currentValue = m_Tones[m_LatchedChannel];
+                WORD currentValue = m_tones[m_latchedChannel];
 
                 // we want to keep the top 12 bits (technically 10 bits) the same value, but replace the bottom 4
                 currentValue &= 0xFFF0;
@@ -158,12 +129,12 @@ void SN79489::WriteData(unsigned long int cycles, BYTE data)
                 // update bottom 4 bits
                 currentValue |= channelData;
 
-                m_Tones[m_LatchedChannel] = currentValue;
+                m_tones[m_latchedChannel] = currentValue;
             }
         }
         else
         {
-            BYTE currentValue = m_Volume[m_LatchedChannel];
+            BYTE currentValue = m_volume[m_latchedChannel];
 
             // we want to keep the top nibble the same
             currentValue &= 0xF0;
@@ -171,7 +142,7 @@ void SN79489::WriteData(unsigned long int cycles, BYTE data)
             // update bottom nibble
             currentValue |= channelData;
 
-            m_Volume[m_LatchedChannel] = currentValue;
+            m_volume[m_latchedChannel] = currentValue;
         }
 
     }
@@ -184,16 +155,16 @@ void SN79489::WriteData(unsigned long int cycles, BYTE data)
         // the data to update with is the bottom 6 bits of the data being passed in
         channelData = (data & 0x3F);
 
-        if (m_IsToneLatched)
+        if (m_isToneLatched)
         {
-            if (m_LatchedChannel == TONES_NOISE)
+            if (m_latchedChannel == Tones::Noise)
             {
-                m_Tones[TONES_NOISE] = (data & 0xF);
+                m_tones[Tones::Noise] = (data & 0xF);
                 m_LFSR = 0x8000;
             }
             else
             {
-                WORD currentValue = m_Tones[m_LatchedChannel];
+                WORD currentValue = m_tones[m_latchedChannel];
                 BYTE currentLowNibble = currentValue & 0xF;
 
                 // update the top 6 bits (10 bit register) of the channel with the low 6 bits of the data
@@ -201,27 +172,139 @@ void SN79489::WriteData(unsigned long int cycles, BYTE data)
                 
                 // we dont want to modify the low 4 bits of what was previously there
                 channelData |= currentLowNibble;
-                m_Tones[m_LatchedChannel] = channelData;
+                m_tones[m_latchedChannel] = channelData;
             }
         }
         else
         {       
-            m_Volume[m_LatchedChannel] = data & 0xF;
+            m_volume[m_latchedChannel] = data & 0xF;
         }
     }
 }
 
-////////////////////////////////////////////////////////////////////
-
-void SN79489::HandleSDLCallback(void* userData, Uint8* buffer, int len)
+void SN79489::reset()
 {
-    SN79489* data = static_cast<SN79489*>(userData);
-    data->HandleSDLCallback(buffer, len);
+    m_bufferUpdateCount = 0;
+    std::fill(m_buffer.begin(), m_buffer.end(), 0);
+    std::fill(m_tones.begin(), m_tones.end(), 0);
+    std::fill(m_counters.begin(), m_counters.end(), 0);
+    m_clockInfo = 0;
+    
+    for (int i = 0; i < 4; i++)
+    {
+        m_volume[i] = 0xF;
+        m_polarity[i] = 1;
+    }
+    m_latchedChannel = Channel::Zero;
+    m_isToneLatched = true;
+    m_currentBufferPos = 0;
+    m_cycles = 0;
+    m_LFSR = 0x8000;
+    SDL_CloseAudio();
+    openSDLAudioDevice();
 }
 
-////////////////////////////////////////////////////////////////////
+void SN79489::update(float cyclesMac)
+{
+    constexpr int sampleRate = 16;
+    cyclesMac /= sampleRate;
 
-void SN79489::HandleSDLCallback(Uint8* buffer, int len)
+    m_cycles += cyclesMac;
+
+    float floor = std::floor(m_cycles);
+    m_clockInfo += static_cast<unsigned long>(floor);
+
+    m_cycles -= floor; 
+
+    m_bufferUpdateCount += floor;
+    
+    // tone channels
+    signed short int tone = 0;
+    
+    for (int i = 0; i < Channel::Three; i++)
+    {
+        if (m_tones[i] == 0)
+        {
+            continue;
+        }
+
+        m_counters[i]-= static_cast<int>(floor);
+
+        if (m_counters[i] <= 0)
+        {
+            m_counters[i] = m_tones[i]; 
+            m_polarity[i] *= -1;
+        }
+
+        tone += m_volumeTable[m_volume[i]] * m_polarity[i];
+    }
+
+    // emulate noise
+    if (m_tones[Tones::Noise] != 0)
+    {
+        m_counters[Tones::Noise] -= static_cast<int>(floor);
+        
+        if (m_counters[Tones::Noise] <= 0)
+        {
+            WORD freq = m_tones[Tones::Noise];
+            freq &= 0x3;
+
+            int count = 0;
+            switch (freq)
+            {
+                case 0: count = 0x10; break;
+                case 1: count = 0x20; break;
+                case 2: count = 0x40; break;
+                case 3: count = m_tones[Channel::Two]; break;
+            }
+
+            m_counters[Tones::Noise] = count;
+            m_polarity[Tones::Noise] *= -1;
+
+            // if the polarity changed from -1 to 1 then shift the random number
+            if (m_polarity[Tones::Noise] == 1)
+            {
+                bool isWhiteNoise = TestBit(m_tones[Tones::Noise], 2);
+                BYTE tappedBits = static_cast<BYTE>(BitGetVal(m_tones[Tones::Noise], 0));
+                tappedBits |= (BitGetVal(m_tones[Tones::Noise], 3) << 3);
+                
+                m_LFSR = (m_LFSR>>1) | ((isWhiteNoise ? parity(m_LFSR & tappedBits) : (m_LFSR & 1)) << 15);
+            }
+        }
+
+        tone += m_volumeTable[m_volume[Tones::Noise]] * (m_LFSR & 1);
+    }
+
+    if (m_bufferUpdateCount >= m_updateBufferLimit)
+    {
+        if (m_currentBufferPos < BUFFERSIZE)
+        {
+            m_buffer[m_currentBufferPos] = tone;
+        }
+            
+        m_currentBufferPos++;
+        m_bufferUpdateCount = m_updateBufferLimit - m_bufferUpdateCount;       
+    }       
+}
+
+void SN79489::dumpClockInfo()
+{
+    char buffer[255];
+    std::memset(buffer, 0, sizeof(buffer));
+    sprintf(buffer, "Sound Chip Clock Cycles Per Second: %lu", m_clockInfo);
+    LogMessage::GetSingleton()->DoLogMessage(buffer, true);
+
+    m_clockInfo = 0;
+}
+
+//private
+void SN79489::handleSDLCallback(void* userData, Uint8* buffer, int len)
+{
+    SN79489* data = static_cast<SN79489*>(userData);
+    data->handleSDLCallback(buffer, len);
+}
+
+void SN79489::handleSDLCallback(Uint8* buffer, int len)
 {
     static int lastLen = 0;
 
@@ -231,117 +314,21 @@ void SN79489::HandleSDLCallback(Uint8* buffer, int len)
         std::cout << "buffer requested " << len << std::endl;
     }
 
-    std::memcpy(buffer, m_Buffer.data(), len);
-    m_CurrentBufferPos = 0;
+    std::memcpy(buffer, m_buffer.data(), len);
+    m_currentBufferPos = 0;
 }
 
-////////////////////////////////////////////////////////////////////
-
-int parity (BYTE data)
+void SN79489::openSDLAudioDevice()
 {
-    int bitCount = BitCount(data, 4);
-    if ((bitCount % 2) == 0)
-    {
-        return 0;
-    }
-    return 1;
+    SDL_AudioSpec as;
+    as.freq = FREQUENCY;
+    as.format = AUDIO_S16SYS;
+    as.channels = 1;
+    as.silence = 0;
+    as.samples = BUFFERSIZE / 4;
+    as.size = 0;
+    as.callback = handleSDLCallback;
+    as.userdata = this;
+    SDL_OpenAudio(&as, 0);
+    SDL_PauseAudio(0);
 }
-
-////////////////////////////////////////////////////////////////////
-
-void SN79489::Update(float cyclesMac)
-{
-    constexpr int sampleRate = 16;
-    cyclesMac /= sampleRate;
-
-    m_Cycles += cyclesMac;
-
-    float floor = std::floor(m_Cycles);
-    m_ClockInfo += static_cast<unsigned long>(floor);
-
-    m_Cycles -= floor; 
-
-    m_BufferUpdateCount += floor;
-    
-    // tone channels
-    signed short int tone = 0;
-    
-    for (int i = 0; i < CHANNEL_THREE; i++)
-    {
-        if (m_Tones[i] == 0)
-        {
-            continue;
-        }
-
-        m_Counters[i]-= static_cast<int>(floor);
-
-        if (m_Counters[i] <= 0)
-        {
-            m_Counters[i] = m_Tones[i]; 
-            m_Polarity[i] *= -1;
-        }
-
-        tone += m_VolumeTable[m_Volume[i]] * m_Polarity[i];
-    }
-
-    // emulate noise
-    if (m_Tones[TONES_NOISE] != 0)
-    {
-        m_Counters[TONES_NOISE] -= static_cast<int>(floor);
-        
-        if (m_Counters[TONES_NOISE] <= 0)
-        {
-            WORD freq = m_Tones[TONES_NOISE];
-            freq &= 0x3;
-
-            int count = 0;
-            switch(freq)
-            {
-                case 0: count = 0x10; break;
-                case 1: count = 0x20; break;
-                case 2: count = 0x40; break;
-                case 3: count = m_Tones[CHANNEL_TWO]; break;
-            }
-
-            m_Counters[TONES_NOISE] = count;
-            m_Polarity[TONES_NOISE] *= -1;
-
-            // if the polarity changed from -1 to 1 then shift the random number
-            if (m_Polarity[TONES_NOISE] == 1)
-            {
-                bool isWhiteNoise = TestBit(m_Tones[TONES_NOISE], 2);
-                BYTE tappedBits = static_cast<BYTE>(BitGetVal(m_Tones[TONES_NOISE], 0));
-                tappedBits |= (BitGetVal(m_Tones[TONES_NOISE], 3) << 3);
-                
-                m_LFSR = (m_LFSR>>1) | ((isWhiteNoise ? parity(m_LFSR & tappedBits) : (m_LFSR & 1)) << 15);
-            }
-        }
-
-        tone += m_VolumeTable[m_Volume[TONES_NOISE]] * (m_LFSR & 1);
-    }
-
-    if (m_BufferUpdateCount >= m_UpdateBufferLimit)
-    {
-        if (m_CurrentBufferPos < BUFFERSIZE)
-        {
-            m_Buffer[m_CurrentBufferPos] = tone;
-        }
-            
-        m_CurrentBufferPos++;
-        m_BufferUpdateCount = m_UpdateBufferLimit - m_BufferUpdateCount;       
-    }       
-}
-
-////////////////////////////////////////////////////////////////////
-
-void SN79489::DumpClockInfo()
-{
-    char buffer[255];
-    std::memset(buffer, 0, sizeof(buffer));
-    sprintf(buffer, "Sound Chip Clock Cycles Per Second: %lu", m_ClockInfo);
-    LogMessage::GetSingleton()->DoLogMessage(buffer, true);
-
-    m_ClockInfo = 0;
-}
-
-////////////////////////////////////////////////////////////////////
