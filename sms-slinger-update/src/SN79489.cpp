@@ -39,8 +39,8 @@ namespace
 
     int parity(BYTE data)
     {
-        int bitCount = BitCount(data, 4);
-        if ((bitCount % 2) == 0)
+        int count = bitCount(data, 4);
+        if ((count % 2) == 0)
         {
             return 0;
         }
@@ -95,7 +95,7 @@ SN79489::SN79489()
 void SN79489::writeData(unsigned long int cycles, BYTE data)
 {
     // if bit 7 is set the it updates the latch
-    if (TestBit(data, 7))
+    if (testBit(data, 7))
     {
         // the channel is indentified by the 6 and 5 bits
         int channel = data;
@@ -106,7 +106,7 @@ void SN79489::writeData(unsigned long int cycles, BYTE data)
         m_latchedChannel = channel;
 
         // if bit 4 is set then the channel we're latching volume, otherwise tone
-        m_isToneLatched = TestBit(data, 4) ? false : true;
+        m_isToneLatched = testBit(data, 4) ? false : true;
         
         // bottom 4 bits are the data to be updated
         BYTE channelData = data & 0xF;
@@ -264,9 +264,9 @@ void SN79489::update(float cyclesMac)
             // if the polarity changed from -1 to 1 then shift the random number
             if (m_polarity[Tones::Noise] == 1)
             {
-                bool isWhiteNoise = TestBit(m_tones[Tones::Noise], 2);
-                BYTE tappedBits = static_cast<BYTE>(BitGetVal(m_tones[Tones::Noise], 0));
-                tappedBits |= (BitGetVal(m_tones[Tones::Noise], 3) << 3);
+                bool isWhiteNoise = testBit(m_tones[Tones::Noise], 2);
+                BYTE tappedBits = static_cast<BYTE>(bitGetVal(m_tones[Tones::Noise], 0));
+                tappedBits |= (bitGetVal(m_tones[Tones::Noise], 3) << 3);
                 
                 m_LFSR = (m_LFSR>>1) | ((isWhiteNoise ? parity(m_LFSR & tappedBits) : (m_LFSR & 1)) << 15);
             }

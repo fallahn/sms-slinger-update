@@ -399,8 +399,8 @@ void Z80::ExecuteOpcode(const BYTE& opcode)
         {
             m_ContextZ80.m_OpcodeCycle = 4;
             m_ContextZ80.m_RegisterAF.hi ^= 0xFF;
-            m_ContextZ80.m_RegisterAF.lo = BitSet(m_ContextZ80.m_RegisterAF.lo, FLAG_N);
-            m_ContextZ80.m_RegisterAF.lo = BitSet(m_ContextZ80.m_RegisterAF.lo, FLAG_H);
+            m_ContextZ80.m_RegisterAF.lo = bitSet(m_ContextZ80.m_RegisterAF.lo, FLAG_N);
+            m_ContextZ80.m_RegisterAF.lo = bitSet(m_ContextZ80.m_RegisterAF.lo, FLAG_H);
 //          if (TestBit(m_ContextZ80.m_RegisterAF.hi,5))
 //              m_ContextZ80.m_RegisterAF.lo = BitSet(m_ContextZ80.m_RegisterAF.lo, FLAG_B5);
 //          else
@@ -441,28 +441,28 @@ void Z80::ExecuteOpcode(const BYTE& opcode)
         case 0x3F:
         {
             m_ContextZ80.m_OpcodeCycle = 4;
-            if (TestBit(m_ContextZ80.m_RegisterAF.lo, FLAG_C))
+            if (testBit(m_ContextZ80.m_RegisterAF.lo, FLAG_C))
             {
-                m_ContextZ80.m_RegisterAF.lo = BitReset(m_ContextZ80.m_RegisterAF.lo, FLAG_C);
-                m_ContextZ80.m_RegisterAF.lo = BitSet(m_ContextZ80.m_RegisterAF.lo, FLAG_H);
+                m_ContextZ80.m_RegisterAF.lo = bitReset(m_ContextZ80.m_RegisterAF.lo, FLAG_C);
+                m_ContextZ80.m_RegisterAF.lo = bitSet(m_ContextZ80.m_RegisterAF.lo, FLAG_H);
             }
             else
             {
-                m_ContextZ80.m_RegisterAF.lo = BitSet(m_ContextZ80.m_RegisterAF.lo, FLAG_C);
-                m_ContextZ80.m_RegisterAF.lo = BitReset(m_ContextZ80.m_RegisterAF.lo, FLAG_H);
+                m_ContextZ80.m_RegisterAF.lo = bitSet(m_ContextZ80.m_RegisterAF.lo, FLAG_C);
+                m_ContextZ80.m_RegisterAF.lo = bitReset(m_ContextZ80.m_RegisterAF.lo, FLAG_H);
             }
 
-            m_ContextZ80.m_RegisterAF.lo = BitReset(m_ContextZ80.m_RegisterAF.lo, FLAG_N);
+            m_ContextZ80.m_RegisterAF.lo = bitReset(m_ContextZ80.m_RegisterAF.lo, FLAG_N);
         }break;
 
         case 0x27: CPU_DAA(); break;
 
         case 0x37:
         {
-            m_ContextZ80.m_RegisterAF.lo = BitSet(m_ContextZ80.m_RegisterAF.lo, FLAG_C); 
+            m_ContextZ80.m_RegisterAF.lo = bitSet(m_ContextZ80.m_RegisterAF.lo, FLAG_C); 
             m_ContextZ80.m_OpcodeCycle = 4;
-            m_ContextZ80.m_RegisterAF.lo = BitReset(m_ContextZ80.m_RegisterAF.lo, FLAG_H);
-            m_ContextZ80.m_RegisterAF.lo = BitReset(m_ContextZ80.m_RegisterAF.lo, FLAG_N); 
+            m_ContextZ80.m_RegisterAF.lo = bitReset(m_ContextZ80.m_RegisterAF.lo, FLAG_H);
+            m_ContextZ80.m_RegisterAF.lo = bitReset(m_ContextZ80.m_RegisterAF.lo, FLAG_N); 
         }
         break;
 

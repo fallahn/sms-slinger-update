@@ -30,50 +30,50 @@ typedef signed char SIGNED_BYTE;
 typedef unsigned short int WORD;
 typedef signed short int SIGNED_WORD;
 
-template <typename typeData>
-inline bool TestBit(typeData inData, int inBitPosition)
+template <typename T>
+inline bool testBit(T inData, int inBitPosition)
 {
-    typeData lMsk = 1 << inBitPosition;
+    T lMsk = 1 << inBitPosition;
     return (inData & lMsk) ? true : false;
 }
 
-template <typename typeData>
-inline typeData BitGet(typeData inData, int inBitPosition)
+template <typename T>
+inline T bitGet(T inData, int inBitPosition)
 {
-    typeData lMsk = 1 << inBitPosition;
+    T lMsk = 1 << inBitPosition;
     return lMsk;
 }
 
-template <typename typeData>
-inline typeData BitGetVal(typeData inData, int inBitPosition)
+template <typename T>
+inline T bitGetVal(T inData, int inBitPosition)
 {
-    typeData lMsk = 1 << inBitPosition;
+    T lMsk = 1 << inBitPosition;
     return (inData & lMsk) ? 1 : 0;
 }
 
-template <typename typeData>
-inline typeData BitSet(typeData inData, int inBitPosition)
+template <typename T>
+inline T bitSet(T inData, int inBitPosition)
 {
-    typeData lMsk = 1 << inBitPosition;
+    T lMsk = 1 << inBitPosition;
     inData |= lMsk;
     return inData;
 }
 
-template <typename typeData>
-inline typeData BitReset(typeData inData, int inBitPosition)
+template <typename T>
+inline T bitReset(T inData, int inBitPosition)
 {
-    typeData lMsk = 1 << inBitPosition;
+    T lMsk = 1 << inBitPosition;
     inData &= ~lMsk;
     return inData;
 }
 
-template <typename typeData>
-int BitCount(typeData inData, int totalBits)
+template <typename T>
+int bitCount(T inData, int totalBits)
 {
     int res = 0;
     for (int i = 0; i < totalBits; i++)
     {
-        if (TestBit(inData, i))
+        if (testBit(inData, i))
         {
             res++;
         }

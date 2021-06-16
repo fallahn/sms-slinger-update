@@ -448,14 +448,14 @@ void Emulator::setKeyPressed(int player, int key)
 {
     assert(player < 2);
     BYTE& port = m_keyboardPorts[player];
-    port = BitReset(port, key);
+    port = bitReset(port, key);
 }
 
 void Emulator::setKeyReleased(int player, int key)
 {
     assert(player < 2);
     BYTE& port = m_keyboardPorts[player];
-    port = BitSet(port, key);
+    port = bitSet(port, key);
 }
 
 void Emulator::resetButton()
@@ -546,9 +546,9 @@ bool Emulator::isCodeMasters()
 void Emulator::doMemPageCM(WORD address, BYTE data)
 {
     CONTEXTZ80* context = m_Z80.GetContext();
-    BYTE page = BitReset(data, 7);
-    page = BitReset(page, 6);
-    page = BitReset(page, 5);
+    BYTE page = bitReset(data, 7);
+    page = bitReset(page, 6);
+    page = bitReset(page, 5);
 
     switch(address)
     {
@@ -582,10 +582,10 @@ void Emulator::doMemPage(WORD address, BYTE data)
             case 0xFFFC:
             {
                 // check for slot 2 ram banking
-                if (TestBit(data,3))
+                if (testBit(data,3))
                 {
                     // which of the two ram banks are we swapping in?
-                    bool secondBank = TestBit(data,2);
+                    bool secondBank = testBit(data,2);
 
                     if (secondBank)
                     {
@@ -602,7 +602,7 @@ void Emulator::doMemPage(WORD address, BYTE data)
                 }
 
                 // apparently no games use ram banking in address 0xC000
-                assert(TestBit(data,4) == 0);
+                assert(testBit(data,4) == 0);
             }
             break;
 
@@ -612,7 +612,7 @@ void Emulator::doMemPage(WORD address, BYTE data)
             case 0xFFFF:
             {
                 // only allow rom banking in slot 2 if ram is not mapped there!
-                if (false == TestBit(context->m_InternalMemory[0xFFFC],3))
+                if (false == testBit(context->m_InternalMemory[0xFFFC],3))
                 {
                     m_thirdBankPage = page;
                     //memcpy(&context->m_InternalMemory[0x8000], &context->m_CartridgeMemory[0x4000*page], 0x4000);

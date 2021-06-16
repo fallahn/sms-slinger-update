@@ -29,7 +29,7 @@
 
 // returns if a bit is set
 template <typename T>
-bool TestBit(T data, int position)
+bool testBit(T data, int position)
 {
     T mask = 1 << position;
     return (data & mask) ? true : false;
@@ -38,7 +38,7 @@ bool TestBit(T data, int position)
 ///////////////////////////////////////////////////////////////////////////////////
 
 template <typename T>
-T BitSet(T data, int position)
+T bitSet(T data, int position)
 {
     T mask = 1 << position;
     data |= mask;
@@ -46,7 +46,7 @@ T BitSet(T data, int position)
 }
 
 template <typename T>
-T BitReset(T data, int position)
+T bitReset(T data, int position)
 {
     T mask = 1 << position;
     data &= ~mask;
@@ -56,7 +56,7 @@ T BitReset(T data, int position)
 ///////////////////////////////////////////////////////////////////////////////////
 
 template <typename T>
-T BitGetVal(T data, int position)
+T bitGetVal(T data, int position)
 {
     T mask = 1 << position ;
     return (data & mask) ? 1 : 0;

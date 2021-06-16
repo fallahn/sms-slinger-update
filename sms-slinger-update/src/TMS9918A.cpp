@@ -131,7 +131,7 @@ void TMS9918A::Reset(bool isPAL)
 
 void TMS9918A::Update(float nextCycle)
 {
-    m_RequestInterupt = TestBit(m_Status,7) && IsRegBitSet(1,5);
+    m_RequestInterupt = testBit(m_Status,7) && IsRegBitSet(1,5);
 
     WORD hcount = m_HCounter;
     bool nextline = false;
@@ -188,7 +188,7 @@ void TMS9918A::Update(float nextCycle)
                 RenderOpt();
             }
             m_IsVBlank = true;
-            m_Status = BitSet(m_Status, 7);
+            m_Status = bitSet(m_Status, 7);
         }
 
         if (m_VCounter >= m_Height)
@@ -248,7 +248,7 @@ void TMS9918A::Update(float nextCycle)
             }
         }
     }
-    if (TestBit(m_Status, 7) && IsRegBitSet(1, 5))
+    if (testBit(m_Status, 7) && IsRegBitSet(1, 5))
     {
         m_RequestInterupt = true;
     }
@@ -415,7 +415,7 @@ void TMS9918A::SetRegData()
 
     if (reg == 5)
     {
-        if (TestBit(m_Status, 7) && IsRegBitSet(1, 5))
+        if (testBit(m_Status, 7) && IsRegBitSet(1, 5))
         {
             m_RequestInterupt = true;
         }
@@ -504,7 +504,7 @@ void TMS9918A::RenderSpritesMode2()
         if (y == 0xD0)
         {
             // if there is no illegal sprites then store this sprite in the status
-            if (!TestBit(m_Status,6))
+            if (!testBit(m_Status,6))
             {
                 m_Status &= 0xE0; // turn off last 5 bits
                 m_Status |= sprite; // puts sprite into last 5 bits
@@ -524,7 +524,7 @@ void TMS9918A::RenderSpritesMode2()
             BYTE x = m_VRAM[location+1];
             BYTE pattern = m_VRAM[location+2];
             BYTE colour = m_VRAM[location+3];
-            bool ec = TestBit(colour,7);
+            bool ec = testBit(colour,7);
 
             if (ec)
             {
@@ -547,7 +547,7 @@ void TMS9918A::RenderSpritesMode2()
             }
             else
             {
-                m_Status = BitReset(m_Status, 6); // not an illegal sprite
+                m_Status = bitReset(m_Status, 6); // not an illegal sprite
             }
 
             int line = m_VCounter - y;
@@ -573,7 +573,7 @@ void TMS9918A::RenderSpritesMode2()
 
 void TMS9918A::SetMode2IllegalSprites(BYTE sprite)
 {
-    m_Status = BitSet(m_Status, 6);
+    m_Status = bitSet(m_Status, 6);
     m_Status &= 0xE0; // turn off last 5 bits
     m_Status |= sprite; // puts sprite into last 5 bits
 }
@@ -596,11 +596,11 @@ void TMS9918A::DrawMode2Sprite(const WORD& address, BYTE x, BYTE line, BYTE colo
         // is this a sprite collision?
         if (GetScreenPixelColour(xpos,m_VCounter,0) != SCREENBLANKCOLOUR)
         {
-            m_Status = BitSet(m_Status,5);
+            m_Status = bitSet(m_Status,5);
             continue;
         }
 
-        if (!TestBit(drawLine, invert))
+        if (!testBit(drawLine, invert))
         {
             continue;
         }
@@ -680,7 +680,7 @@ void TMS9918A::RenderSpritesMode4()
             {
                 if (y < (vCounter + 9))
                 {
-                    tileNumber = BitReset(tileNumber, 0);
+                    tileNumber = bitReset(tileNumber, 0);
                 }
             }
 
@@ -709,13 +709,13 @@ void TMS9918A::RenderSpritesMode4()
                     continue;
                 }
                 BYTE palette = 0;
-                BYTE bit = BitGetVal(data4,col);
+                BYTE bit = bitGetVal(data4,col);
                 palette = (bit << 3);
-                bit = BitGetVal(data3,col);
+                bit = bitGetVal(data3,col);
                 palette |= (bit << 2);
-                bit = BitGetVal(data2,col);
+                bit = bitGetVal(data2,col);
                 palette |= (bit << 1);
-                bit = BitGetVal(data1, col);
+                bit = bitGetVal(data1, col);
                 palette |= bit;
 
                 // sprites can only use the second palette, i think.
@@ -744,21 +744,21 @@ void TMS9918A::RenderSpritesMode4()
 
 bool TMS9918A::IsRegBitSet(int reg, BYTE bit)
 {
-    return TestBit(m_VDPRegisters[reg], bit);
+    return testBit(m_VDPRegisters[reg], bit);
 }
 
 /////////////////////////////////////////////////////////////////////////
 
 void TMS9918A::SetSpriteOverflow()
 {
-    m_Status = BitSet(m_Status, 6);
+    m_Status = bitSet(m_Status, 6);
 }
 
 /////////////////////////////////////////////////////////////////////////
 
 void TMS9918A::SetSpriteCollision()
 {
-    m_Status = BitSet(m_Status, 5);
+    m_Status = bitSet(m_Status, 5);
 }
 
 /////////////////////////////////////////////////////////////////////////
@@ -774,10 +774,10 @@ void TMS9918A::RenderBackgroundMode2()
     BYTE reg4 = m_VDPRegisters[0x4];
 
     // if bit 2 is set of reg 4 the pattern table address starts at 0x2000 otherwise 0x0
-    WORD pgBase = TestBit(reg4, 2) ? 0x2000 : 0x0;
+    WORD pgBase = testBit(reg4, 2) ? 0x2000 : 0x0;
 
     // if bit 7 is set of reg 3 the colour table address starts at 0x2000 otherwise 0x0
-    WORD colBase = TestBit(reg3, 7) ? 0x2000 : 0x0;
+    WORD colBase = testBit(reg3, 7) ? 0x2000 : 0x0;
 
     // bits 0 to 6 of reg 3 get anded over bits 1-7 of the character number
     BYTE colAnd = reg3 & 127;
@@ -786,7 +786,7 @@ void TMS9918A::RenderBackgroundMode2()
     colAnd <<= 1;
 
     // make sure bit 0 is set to it doesnt affect bit 0 of character number as we only want to affect 1-7
-    colAnd = BitSet(colAnd, 0);
+    colAnd = bitSet(colAnd, 0);
     
     int row = m_VCounter / 8;
 
@@ -800,7 +800,7 @@ void TMS9918A::RenderBackgroundMode2()
         if (row > 15)
         {
             // then use table 3 if bit 1 of reg 4 is set else use table 0
-            if (TestBit(reg4, 1))
+            if (testBit(reg4, 1))
             {
                 pgTable = 2;
             }
@@ -809,7 +809,7 @@ void TMS9918A::RenderBackgroundMode2()
         else
         {
             // then use table 2 if bit 0 of reg 4 is set else use table 0
-            if (TestBit(reg4, 0))
+            if (testBit(reg4, 0))
             {
                 pgTable = 1;
             }
@@ -850,7 +850,7 @@ void TMS9918A::RenderBackgroundMode2()
         int invert = 7;
         for (int x = 0; x < 8; x++, invert--)
         {
-            BYTE colNum = TestBit(pixelLine, invert)?fore:back;
+            BYTE colNum = testBit(pixelLine, invert)?fore:back;
 
             if (colNum == 0)
             {
@@ -952,10 +952,10 @@ void TMS9918A::RenderBackgroundMode4()
             WORD tileData = m_VRAM[nameBaseOffset+1] << 8;
             tileData |= m_VRAM[nameBaseOffset];
 
-            bool hiPriority = TestBit(tileData,12);
-            bool useSpritePalette = TestBit(tileData,11);
-            bool vertFlip = TestBit(tileData,10);
-            bool horzFlip = TestBit(tileData,9);
+            bool hiPriority = testBit(tileData,12);
+            bool useSpritePalette = testBit(tileData,11);
+            bool vertFlip = testBit(tileData,10);
+            bool horzFlip = testBit(tileData,9);
             WORD tileDefinition = tileData & 0x1FF;
 
             int offset = vCounter;;            
@@ -987,13 +987,13 @@ void TMS9918A::RenderBackgroundMode4()
             }                   
 
             BYTE palette = 0;
-            BYTE bit = BitGetVal(data4,colourbit);
+            BYTE bit = bitGetVal(data4,colourbit);
             palette = (bit << 3);
-            bit = BitGetVal(data3,colourbit);
+            bit = bitGetVal(data3,colourbit);
             palette |= (bit << 2);
-            bit = BitGetVal(data2,colourbit);
+            bit = bitGetVal(data2,colourbit);
             palette |= (bit << 1);
-            bit = BitGetVal(data1, colourbit);
+            bit = bitGetVal(data1, colourbit);
             palette |= bit;
 
             bool masking = false;
@@ -1077,8 +1077,8 @@ WORD TMS9918A::GetSATBase() const
     BYTE reg5 = m_VDPRegisters[0x5];
 
     // bits 7 and 0 are ignored
-    reg5 = BitReset(reg5, 7);
-    reg5 = BitReset(reg5, 0);
+    reg5 = bitReset(reg5, 7);
+    reg5 = bitReset(reg5, 0);
 
     WORD res = reg5 << 7;
     return res;
@@ -1093,7 +1093,7 @@ WORD TMS9918A::GetNameBase() const
 
     // bit 0 is ignored so is top nibble
     reg2 &= 0xF;
-    reg2 = BitReset(reg2,0);
+    reg2 = bitReset(reg2,0);
 
     if (m_Height != NUM_RES_VERTICAL)
     {
@@ -1134,10 +1134,10 @@ BYTE TMS9918A::GetColourShade(BYTE val) const
 BYTE TMS9918A::GetVDPMode() const
 {
     BYTE res = 0;
-    res |= BitGetVal(m_VDPRegisters[0x0],2) << 3;
-    res |= BitGetVal(m_VDPRegisters[0x1],3) << 2;
-    res |= BitGetVal(m_VDPRegisters[0x0],1) << 1;
-    res |= BitGetVal(m_VDPRegisters[0x1],4);
+    res |= bitGetVal(m_VDPRegisters[0x0],2) << 3;
+    res |= bitGetVal(m_VDPRegisters[0x1],3) << 2;
+    res |= bitGetVal(m_VDPRegisters[0x0],1) << 1;
+    res |= bitGetVal(m_VDPRegisters[0x1],4);
     return res;
 }
 
