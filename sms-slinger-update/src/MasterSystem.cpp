@@ -28,14 +28,45 @@
 #include "Emulator.hpp"
 #include "TMS9918A.hpp"
 
+#include "glad.hpp"
+
 #include <SDL.h>
-#include <SDL_OpenGL.h>
 
 #include <iostream>
 #include <cassert>
 
 namespace
 {
+    const std::string Vertex = 
+        R"(
+        #version 330 core
+
+        layout (location = 0) in vec2 a_position;
+        layout (location = 1) in vec2 a_texCoord;
+
+        out vec2 v_texCoord;
+
+        void main()
+        {
+            v_texCoord = a_texCoord;
+            gl_Position = vec4(a_position.x, a_position.y, 0.0, 1.0);
+        })";
+
+    const std::string Fragment = 
+        R"(
+        #version 330 core
+
+        uniform sampler2D u_texture;
+
+        in vec2 v_texCoord;
+
+        out vec4 FragColour;
+
+        void main()
+        {
+            FragColour = texture(u_texture, v_texCoord);
+        })";
+
     constexpr int WINDOWWIDTH = 256;
     constexpr int WINDOWHEIGHT = 192;
     constexpr int SCREENSCALE = 1;
@@ -73,9 +104,36 @@ MasterSystem::MasterSystem()
     : m_emulator(nullptr),
     m_width     (0),
     m_height    (0),
-    m_useGFXOpt (false)
+    m_useGFXOpt (false),
+    m_shader    (0),
+    m_texture   (0),
+    m_vao       (0),
+    m_vbo       (0)
 {
     m_emulator = Emulator::createInstance();
+}
+
+MasterSystem::~MasterSystem()
+{
+    if (m_vao)
+    {
+        glDeleteVertexArrays(1, &m_vao);
+    }
+
+    if (m_vbo)
+    {
+        glDeleteBuffers(1, &m_vbo);
+    }
+
+    if (m_shader)
+    {
+        glDeleteProgram(m_shader);
+    }
+
+    if (m_texture)
+    {
+        glDeleteTextures(1, &m_texture);
+    }
 }
 
 //public
@@ -110,6 +168,15 @@ bool MasterSystem::createSDLWindow()
         return false;
     }
 
+
+    //for some reason this has to be done first on macOS
+#ifdef __APPLE__
+    SDL_GL_SetAttribute(SDL_GL_CONTEXT_PROFILE_MASK, SDL_GL_CONTEXT_PROFILE_CORE);
+    SDL_GL_SetAttribute(SDL_GL_CONTEXT_MAJOR_VERSION, 3);
+    SDL_GL_SetAttribute(SDL_GL_CONTEXT_MINOR_VERSION, 3);
+    SDL_GL_SetAttribute(SDL_GL_DOUBLEBUFFER, 1);
+#endif
+
     ctx = SDL_GL_CreateContext(window);
     if (ctx == nullptr)
     {
@@ -118,8 +185,27 @@ bool MasterSystem::createSDLWindow()
         return false;
     }
 
+#ifndef __APPLE__
+    SDL_GL_SetAttribute(SDL_GL_CONTEXT_PROFILE_MASK, SDL_GL_CONTEXT_PROFILE_CORE);
+    SDL_GL_SetAttribute(SDL_GL_CONTEXT_MAJOR_VERSION, 3);
+    SDL_GL_SetAttribute(SDL_GL_CONTEXT_MINOR_VERSION, 3);
+    SDL_GL_SetAttribute(SDL_GL_DOUBLEBUFFER, 1);
+#endif
 
-    initGL();
+    if (!gladLoadGLLoader(SDL_GL_GetProcAddress))
+    {
+        std::cout << "Failed loading OpenGL" << std::endl;
+        SDL_GL_DeleteContext(ctx);
+        SDL_Quit();
+        return false;
+    }
+
+    if (!initGL())
+    {
+        SDL_GL_DeleteContext(ctx);
+        SDL_Quit();
+        return false;
+    }
     initAudio();
     return true;
 }
@@ -143,20 +229,151 @@ void MasterSystem::beginGame(int fps, bool useGFXOpt)
 }
 
 //private
-void MasterSystem::initGL()
+bool MasterSystem::initGL()
 {
+    if (!loadShader())
+    {
+        std::cout << "Failed to create Shader!" << std::endl;
+        return false;
+    }
+
+    if (!loadTexture())
+    {
+        std::cout << "Failed to create Texture!" << std::endl;
+        return false;
+    }
+
+    if (!loadQuad())
+    {
+        std::cout << "Failed to createQuad!" << std::endl;
+        return false;
+    }
+
+
     glViewport(0, 0, m_width, m_height);
 
     glClearColor(0.f, 0.f, 1.f, 1.f);
-    glClear(GL_COLOR_BUFFER_BIT);
-    glMatrixMode(GL_MODELVIEW);
-    glLoadIdentity();
-    glOrtho(0, m_width, m_height, 0, -1.0, 1.0);
 
     glEnable(GL_TEXTURE_2D);
     glEnable(GL_CULL_FACE);
     glDisable(GL_DEPTH_TEST);
     glDisable(GL_BLEND);
+
+    return true;
+}
+
+bool MasterSystem::loadShader()
+{
+    //vert shader
+    const char* vertSrc = Vertex.c_str();
+    
+    auto vertShader = glCreateShader(GL_VERTEX_SHADER);
+    glShaderSource(vertShader, 1, &vertSrc, nullptr);
+    glCompileShader(vertShader);
+
+    std::int32_t success = -1;
+    glGetShaderiv(vertShader, GL_COMPILE_STATUS, &success);
+    if (!success)
+    {
+        std::cout << "Failed to compile Vertex Shader" << std::endl;
+        return false;
+    }
+
+    //frag shader
+    const char* fragSrc = Fragment.c_str();
+
+    auto fragShader = glCreateShader(GL_FRAGMENT_SHADER);
+    glShaderSource(fragShader, 1, &fragSrc, nullptr);
+    glCompileShader(fragShader);
+
+    glGetShaderiv(fragShader, GL_COMPILE_STATUS, &success);
+    if (!success)
+    {
+        std::cout << "Failed to compile Fragment Shader" << std::endl;
+        return false;
+    }
+
+    
+    //link to program
+    m_shader = glCreateProgram();
+    glAttachShader(m_shader, vertShader);
+    glAttachShader(m_shader, fragShader);
+    glLinkProgram(m_shader);
+
+    glGetProgramiv(m_shader, GL_LINK_STATUS, &success);
+    if (!success)
+    {
+        std::cout << "Failed to link shader" << std::endl;
+        glDeleteShader(fragShader);
+        glDeleteShader(vertShader);
+
+        return false;
+    }
+
+    glDeleteShader(fragShader);
+    glDeleteShader(vertShader);
+
+    return true;
+}
+
+bool MasterSystem::loadTexture()
+{
+    //this is the only texture we have so just set it once
+    //here, instead of every frame.
+    glActiveTexture(GL_TEXTURE0);
+
+
+    glGenTextures(1, &m_texture);
+    glBindTexture(GL_TEXTURE_2D, m_texture);
+
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, m_width, m_height, 0, GL_RGB, GL_UNSIGNED_BYTE, nullptr);
+
+
+    glUseProgram(m_shader);
+    glUniform1i(0, 0); //assume this is the only uniform, therefore 0. Norty.
+
+    return true;
+}
+
+bool MasterSystem::loadQuad()
+{
+    std::array verts =
+    {
+        -1.f, 1.f,
+        0.f, 0.f,
+
+        -1.f, -1.f,
+        0.f, 1.f,
+
+        1.f, 1.f,
+        1.f, 0.f,
+
+        1.f, -1.f,
+        1.f, 1.f
+    };
+
+    glGenVertexArrays(1, &m_vao);
+    glGenBuffers(1, &m_vbo);
+
+    glBindVertexArray(m_vao);
+
+    glBindBuffer(GL_ARRAY_BUFFER, m_vbo);
+    glBufferData(GL_ARRAY_BUFFER, verts.size() * sizeof(float), verts.data(), GL_STATIC_DRAW);
+
+    //pos
+    glVertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, 4 * sizeof(float), (void*)0);
+    glEnableVertexAttribArray(0);
+
+    //uv
+    glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, 4 * sizeof(float), (void*)(2*sizeof(float)));
+    glEnableVertexAttribArray(1);
+
+    glBindVertexArray(0);
+    glBindBuffer(GL_ARRAY_BUFFER, 0);
+
+    return true;
 }
 
 void MasterSystem::initAudio()
@@ -168,9 +385,8 @@ void MasterSystem::initAudio()
     as.silence = 0;
     as.samples = SN79489::BUFFERSIZE;
     as.size = 0;
-    //as.callback = audioCallback;
-    //as.userdata = &m_emulator->getSoundChip();
-
+    as.callback = nullptr; //we're pulling from the soundcard
+    
     audioDevice = SDL_OpenAudioDevice(nullptr, 0, &as, nullptr, 0);
     SDL_PauseAudioDevice(audioDevice, 1);
 }
@@ -325,10 +541,20 @@ void MasterSystem::renderGame()
             m_width = width;
             m_height = height;
             SDL_SetWindowSize(window, m_width, m_height);
+
+            //TODO resize texture
         }
 
+        //again, assuming we only have one texture that is always bound
+        glTexSubImage2D(GL_TEXTURE_2D, 0, 0, 0, m_width, m_height, GL_RGB, GL_UNSIGNED_BYTE, m_emulator->getGraphicChip().screenStandard);
+
         glClear(GL_COLOR_BUFFER_BIT);
-        glLoadIdentity();
+
+        glUseProgram(m_shader);
+        glBindVertexArray(m_vao);
+        glDrawArrays(GL_TRIANGLE_STRIP, 0, 4);
+
+        /*glLoadIdentity();
         glRasterPos2i(-1, 1);
         glPixelZoom(1, -1);
         if (height == SCREENSCALE * TMS9918A::NUM_RES_VERTICAL)
@@ -342,7 +568,7 @@ void MasterSystem::renderGame()
         else if (height == SCREENSCALE * TMS9918A::NUM_RES_VERT_HIGH)
         {
             glDrawPixels(m_width, m_height, GL_RGB, GL_UNSIGNED_BYTE, m_emulator->getGraphicChip().screenHigh);
-        }
+        }*/
 
         SDL_GL_SwapWindow(window);
     }

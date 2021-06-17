@@ -151,6 +151,7 @@
     <ClInclude Include="src\Config.hpp" />
     <ClInclude Include="src\Emulator.hpp" />
     <ClInclude Include="src\GameSettings.hpp" />
+    <ClInclude Include="src\glad.hpp" />
     <ClInclude Include="src\LogMessages.hpp" />
     <ClInclude Include="src\MasterSystem.hpp" />
     <ClInclude Include="src\SN79489.hpp" />
@@ -163,6 +164,7 @@
   <ItemGroup>
     <ClCompile Include="src\Emulator.cpp" />
     <ClCompile Include="src\GameSettings.cpp" />
+    <ClCompile Include="src\glad.c" />
     <ClCompile Include="src\main.cpp" />
     <ClCompile Include="src\LogMessages.cpp" />
     <ClCompile Include="src\MasterSystem.cpp" />

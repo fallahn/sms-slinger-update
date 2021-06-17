@@ -2,6 +2,7 @@
 set(PROJECT_SRC
   ${PROJECT_DIR}/Emulator.cpp
   ${PROJECT_DIR}/GameSettings.cpp
+  ${PROJECT_DIR}/glad.c
   ${PROJECT_DIR}/LogMessages.cpp
   ${PROJECT_DIR}/main.cpp
   ${PROJECT_DIR}/MasterSystem.cpp

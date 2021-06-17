@@ -34,6 +34,13 @@ class MasterSystem final
 {
 public:
     MasterSystem();
+    ~MasterSystem();
+
+    MasterSystem(MasterSystem&&) = delete;
+    MasterSystem(const MasterSystem&) = delete;
+
+    MasterSystem& operator = (MasterSystem&&) = delete;
+    MasterSystem& operator = (const MasterSystem&) = delete;
 
     static MasterSystem* createInstance();
 
@@ -50,7 +57,16 @@ private:
     int m_height;
     bool m_useGFXOpt;
 
-    void initGL();
+    std::uint32_t m_shader;
+    std::uint32_t m_texture;
+    std::uint32_t m_vao;
+    std::uint32_t m_vbo;
+
+
+    bool initGL();
+    bool loadShader();
+    bool loadTexture();
+    bool loadQuad();
     void initAudio();
 
     void romLoopFixedStep(int fps);
