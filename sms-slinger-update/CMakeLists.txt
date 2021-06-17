@@ -45,5 +45,6 @@ target_link_libraries(${PROJECT_NAME}
 
 #glad needs dl
 if(UNIX AND NOT APPLE)
-  target_link_libraries(${CMAKE_DL_LIBS})
+  target_link_libraries(${PROJECT_NAME}
+  ${CMAKE_DL_LIBS})
 endif()
