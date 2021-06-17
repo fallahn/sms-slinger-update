@@ -29,6 +29,7 @@
 #include "TMS9918A.hpp"
 
 #include <iostream>
+#include <cassert>
 
 namespace
 {
@@ -40,39 +41,27 @@ namespace
     SDL_GLContext ctx = nullptr;
     SDL_AudioDeviceID audioDevice = 0;
 
-    //TODO replace this with ImGui
-    unsigned int fpstime = 0;
-    int count = 0;
-    bool first = true;
-
-    bool LogFrameRate()
+    class HiResTimer final
     {
-        bool res = false;
-        if (first)
+    public:
+        HiResTimer()
         {
-            first = false;
-            fpstime = SDL_GetTicks();
+            m_start = m_current = SDL_GetPerformanceCounter();
+            m_frequency = SDL_GetPerformanceFrequency();
         }
 
-        unsigned int fpscurrent = SDL_GetTicks();
-        if ((fpstime + 1000) < fpscurrent)
+        float restart()
         {
-            fpstime = fpscurrent;
-            char buffer[255];
-            sprintf(buffer, "FPS %d", count);
-            count = 0;
-            SDL_SetWindowTitle(window, buffer);
-            res = true;
+            m_start = m_current;
+            m_current = SDL_GetPerformanceCounter();
+            return static_cast<float>(m_current - m_start) / static_cast<float>(m_frequency);
         }
-        count++;
-        return res;
-    }
 
-    void audioCallback(void* userData, Uint8* buffer, int len)
-    {
-        SN79489* data = static_cast<SN79489*>(userData);
-        data->audioCallback(buffer, len);
-    }
+    private:
+        Uint64 m_start = 0;
+        Uint64 m_current = 0;
+        Uint64 m_frequency = 0;
+    };
 }
 
 std::unique_ptr<MasterSystem> MasterSystem::m_instance;
@@ -129,6 +118,7 @@ bool MasterSystem::createSDLWindow()
 
 void MasterSystem::startRom(const char* path)
 {
+    //TODO fix pausing audio device, causes a crash in release mode
     SDL_PauseAudioDevice(audioDevice, 1);
 
     m_emulator->reset();
@@ -141,7 +131,8 @@ void MasterSystem::beginGame(int fps, bool useGFXOpt)
 {
     m_useGFXOpt = useGFXOpt;
     m_emulator->setGFXOpt(useGFXOpt);
-    romLoop(fps);
+    
+    fps > 0 ? romLoopFixedStep(fps) : romLoopFree();
 }
 
 unsigned char MasterSystem::getMemoryByte(int i)
@@ -182,56 +173,18 @@ void MasterSystem::initAudio()
     audioDevice = SDL_OpenAudioDevice(nullptr, 0, &as, nullptr, 0);
 }
 
-void MasterSystem::renderGame()
+void MasterSystem::romLoopFixedStep(int fps)
 {
-    if (TMS9918A::frameToggle && !TMS9918A::screenDisabled)
-    {
-        int width = SCREENSCALE * m_emulator->getGraphicChip().getWidth();
-        int height = SCREENSCALE * m_emulator->getGraphicChip().getHeight();
-
-        if (width != m_width || height != m_height)
-        {
-            m_width = width;
-            m_height = height;
-            SDL_SetWindowSize(window, m_width, m_height);
-        }
-
-        glClear(GL_COLOR_BUFFER_BIT);
-        glLoadIdentity();
-        glRasterPos2i(-1, 1);
-        glPixelZoom(1, -1);
-        if (height == SCREENSCALE * TMS9918A::NUM_RES_VERTICAL)
-        {
-            glDrawPixels(m_width, m_height, GL_RGB, GL_UNSIGNED_BYTE, m_emulator->getGraphicChip().screenStandard);
-        }
-        else if (height == SCREENSCALE * TMS9918A::NUM_RES_VERT_MED)
-        {
-            glDrawPixels(m_width, m_height, GL_RGB, GL_UNSIGNED_BYTE, m_emulator->getGraphicChip().screenMed);
-        }
-        else if (height == SCREENSCALE * TMS9918A::NUM_RES_VERT_HIGH)
-        {
-            glDrawPixels(m_width, m_height, GL_RGB, GL_UNSIGNED_BYTE, m_emulator->getGraphicChip().screenHigh);
-        }
-
-        SDL_GL_SwapWindow(window);
-    }
-}
-
-void MasterSystem::romLoop(int fps)
-{
+    assert(fps > 0);
     bool quit = false;
-    SDL_Event event;
-    bool sync = true;
 
-    if (fps == -1)
-    {
-        sync = false;
-    }
-
-    unsigned int time2 = SDL_GetTicks();
+    HiResTimer timer;
+    const float FrameTime = 1.f / fps;
+    float accumulator = 0.f;
 
     while (!quit)
     {
+        SDL_Event event;
         while(SDL_PollEvent(&event)) 
         {
             if (event.type == SDL_QUIT
@@ -241,29 +194,45 @@ void MasterSystem::romLoop(int fps)
             }
         }
 
-        unsigned int current = SDL_GetTicks();
+        accumulator += timer.restart();
 
-        if (sync && (time2 + (1000 / fps)) < current)
+        while (accumulator > FrameTime)
         {
+            accumulator -= FrameTime;
+
             m_emulator->update();
             renderGame();
-            time2 = current;
-            if (LogFrameRate())
-            {
-                m_emulator->dumpClockInfo();
-            }
-        }
-        else if (!sync)
-        {
-            m_emulator->update();
-            renderGame();
-
-            LogFrameRate();
         }
 
         auto [data, size] = m_emulator->getSoundChip().getSamples();
         SDL_QueueAudio(audioDevice, data, size);
+    }
 
+    SDL_GL_DeleteContext(ctx);
+    SDL_Quit();
+}
+
+void MasterSystem::romLoopFree()
+{
+    bool quit = false;
+
+    while (!quit)
+    {
+        SDL_Event event;
+        while (SDL_PollEvent(&event))
+        {
+            if (event.type == SDL_QUIT
+                || handleInput(event))
+            {
+                quit = true;
+            }
+        }
+
+        m_emulator->update();
+        renderGame();
+
+        auto [data, size] = m_emulator->getSoundChip().getSamples();
+        SDL_QueueAudio(audioDevice, data, size);
     }
 
     SDL_GL_DeleteContext(ctx);
@@ -330,4 +299,39 @@ bool MasterSystem::handleInput(const SDL_Event& event)
         }
     }
     return false;
+}
+
+void MasterSystem::renderGame()
+{
+    if (TMS9918A::frameToggle && !TMS9918A::screenDisabled)
+    {
+        int width = SCREENSCALE * m_emulator->getGraphicChip().getWidth();
+        int height = SCREENSCALE * m_emulator->getGraphicChip().getHeight();
+
+        if (width != m_width || height != m_height)
+        {
+            m_width = width;
+            m_height = height;
+            SDL_SetWindowSize(window, m_width, m_height);
+        }
+
+        glClear(GL_COLOR_BUFFER_BIT);
+        glLoadIdentity();
+        glRasterPos2i(-1, 1);
+        glPixelZoom(1, -1);
+        if (height == SCREENSCALE * TMS9918A::NUM_RES_VERTICAL)
+        {
+            glDrawPixels(m_width, m_height, GL_RGB, GL_UNSIGNED_BYTE, m_emulator->getGraphicChip().screenStandard);
+        }
+        else if (height == SCREENSCALE * TMS9918A::NUM_RES_VERT_MED)
+        {
+            glDrawPixels(m_width, m_height, GL_RGB, GL_UNSIGNED_BYTE, m_emulator->getGraphicChip().screenMed);
+        }
+        else if (height == SCREENSCALE * TMS9918A::NUM_RES_VERT_HIGH)
+        {
+            glDrawPixels(m_width, m_height, GL_RGB, GL_UNSIGNED_BYTE, m_emulator->getGraphicChip().screenHigh);
+        }
+
+        SDL_GL_SwapWindow(window);
+    }
 }

@@ -54,7 +54,10 @@ private:
 
     void initGL();
     void initAudio();
-    void renderGame();
-    void romLoop(int fps);
+
+    void romLoopFixedStep(int fps);
+    void romLoopFree();
+
     bool handleInput(const SDL_Event& event);
+    void renderGame();
 };
