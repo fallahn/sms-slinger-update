@@ -25,14 +25,13 @@
 
 #include "MasterSystem.hpp"
 
-int main (int argsc, char** argsv)
+int main (int, char**)
 {
-    MasterSystem* sms = MasterSystem::createInstance();
-    if (sms->createSDLWindow())
+    MasterSystem sms;
+    if (sms.createSDLWindow())
     {
-        //sms->startRom("roms/lander2_v0C.sms");
-        sms->startRom("roms/cb01f.sms");
-        sms->beginGame(0);
+        sms.startRom("roms/cb01f.sms");
+        sms.beginGame(0);
     }
     return 0;
 }

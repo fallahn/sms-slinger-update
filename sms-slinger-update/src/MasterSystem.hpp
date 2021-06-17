@@ -42,15 +42,12 @@ public:
     MasterSystem& operator = (MasterSystem&&) = delete;
     MasterSystem& operator = (const MasterSystem&) = delete;
 
-    static MasterSystem* createInstance();
-
     bool createSDLWindow();
     void startRom(const char* path);
     //value < 1 for no sync, else attempts to sync to given frame rate
     void beginGame(int fps = -1, bool useGfxOpt = false);
 
 private:
-    static std::unique_ptr<MasterSystem> m_instance;
 
     Emulator* m_emulator;
     int m_width;

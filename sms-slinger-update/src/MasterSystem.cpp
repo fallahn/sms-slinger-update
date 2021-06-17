@@ -99,8 +99,6 @@ namespace
     };
 }
 
-std::unique_ptr<MasterSystem> MasterSystem::m_instance;
-
 MasterSystem::MasterSystem()
     : m_emulator(nullptr),
     m_width     (0),
@@ -138,15 +136,6 @@ MasterSystem::~MasterSystem()
 }
 
 //public
-MasterSystem* MasterSystem::createInstance()
-{
-    if (m_instance == nullptr)
-    {
-        m_instance = std::make_unique<MasterSystem>();
-    }
-    return m_instance.get();
-}
-
 bool MasterSystem::createSDLWindow()
 {
     m_width = WINDOWWIDTH;

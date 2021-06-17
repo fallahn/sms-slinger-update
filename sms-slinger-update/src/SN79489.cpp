@@ -250,6 +250,7 @@ void SN79489::update(float cyclesMac)
                 case 1: count = 0x20; break;
                 case 2: count = 0x40; break;
                 case 3: count = m_tones[Channel::Two]; break;
+                default: break;
             }
 
             m_counters[Tones::Noise] = count;
@@ -262,7 +263,7 @@ void SN79489::update(float cyclesMac)
                 BYTE tappedBits = static_cast<BYTE>(bitGetVal(m_tones[Tones::Noise], 0));
                 tappedBits |= (bitGetVal(m_tones[Tones::Noise], 3) << 3);
                 
-                m_LFSR = (m_LFSR>>1) | ((isWhiteNoise ? parity(m_LFSR & tappedBits) : (m_LFSR & 1)) << 15);
+                m_LFSR = (m_LFSR >> 1) | ((isWhiteNoise ? parity(m_LFSR & tappedBits) : (m_LFSR & 1)) << 15);
             }
         }
 

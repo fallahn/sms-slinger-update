@@ -63,8 +63,7 @@ bool TMS9918A::screenDisabled = true;
 bool TMS9918A::frameToggle = true;
 
 TMS9918A::TMS9918A()
-    : m_currentBuffer       (m_screenStandard.data()),
-    m_runningCycles         (0.f),
+    : m_runningCycles       (0.f),
     m_clockInfo             (0),
     m_isPAL                 (true),
     m_numScanlines          (NUM_NTSC_VERTICAL),
@@ -165,17 +164,17 @@ void TMS9918A::update(float nextCycle)
             if (mode == 11)
             {
                 m_height = NUM_RES_VERT_MED;
-                m_currentBuffer = m_screenMed.data();
+                //m_currentBuffer = m_screenMed.data();
             }
             else if (mode == 14)
             {
                 m_height = NUM_RES_VERT_HIGH;
-                m_currentBuffer = m_screenHigh.data();
+                //m_currentBuffer = m_screenHigh.data();
             }
             else
             {
                 m_height = NUM_RES_VERTICAL;
-                m_currentBuffer = m_screenStandard.data();
+                //m_currentBuffer = m_screenStandard.data();
             }
         }
 
@@ -297,8 +296,6 @@ void TMS9918A::writeVDPAddress(BYTE data)
         m_controlWord &= 0xFF00;
         m_controlWord |= data;
     }
-    //  sprintf(buffer, "Value after write is %x", GetAddressRegister());
-    //  LogMessage::GetSingleton()->DoLogMessage(buffer,false);
 }
 
 BYTE TMS9918A::readDataPort()
@@ -307,11 +304,18 @@ BYTE TMS9918A::readDataPort()
 
     BYTE res = m_readBuffer;
 
-    auto reg = getCodeRegister();
-    switch (reg)
+    auto code = getCodeRegister();
+    switch (code)
     {
-        case 0: m_readBuffer = m_VRAM[getAddressRegister()]; break; // not sure about this one
-        case 1: m_readBuffer = m_VRAM[getAddressRegister()]; break;
+        case 0:
+        case 1:
+        case 2:
+        case 3:
+            m_readBuffer = m_VRAM[getAddressRegister()]; break;
+            //undefined - return no value ?
+            //case 3:
+            //res = 0xff;
+            break;
         default: assert(false); break;
     }
 
@@ -368,21 +372,7 @@ void TMS9918A::resetScreen()
         frameToggle = true;
     }
 
-    if (m_height == NUM_RES_VERTICAL)
-    {
-        std::fill(m_screenStandard.begin(), m_screenStandard.end(), SCREENBLANKCOLOUR);
-        m_currentBuffer = m_screenStandard.data();
-    }
-    else if (m_height == NUM_RES_VERT_MED)
-    {
-        std::fill(m_screenMed.begin(), m_screenMed.end(), SCREENBLANKCOLOUR);
-        m_currentBuffer = m_screenMed.data();
-    }
-    else if (m_height == NUM_RES_VERT_HIGH)
-    {
-        std::fill(m_screenHigh.begin(), m_screenHigh.end(), SCREENBLANKCOLOUR);
-        m_currentBuffer = m_screenHigh.data();
-    }
+    std::fill(m_buffer.begin(), m_buffer.end(), SCREENBLANKCOLOUR);
 }
 
 BYTE TMS9918A::getHCounter() const
@@ -1092,15 +1082,15 @@ BYTE TMS9918A::getVDPMode() const
 void TMS9918A::writeToScreen(BYTE x, BYTE y,BYTE red, BYTE green, BYTE blue)
 {
     auto idx = y * (NUM_RES_HORIZONTAL * BYTES_PER_CHANNEL) + (BYTES_PER_CHANNEL * x);
-    m_currentBuffer[idx] = red;
-    m_currentBuffer[idx+1] = green;
-    m_currentBuffer[idx+2] = blue;
+    m_buffer[idx] = red;
+    m_buffer[idx+1] = green;
+    m_buffer[idx+2] = blue;
 }
 
 BYTE TMS9918A::getScreenPixelColour(BYTE x, BYTE y, int index) const
 {
     auto idx = y * (NUM_RES_HORIZONTAL * BYTES_PER_CHANNEL) + (BYTES_PER_CHANNEL * x);
-    return m_currentBuffer[idx + index];
+    return m_buffer[idx + index];
 }
 
 BYTE TMS9918A::getVJump() const

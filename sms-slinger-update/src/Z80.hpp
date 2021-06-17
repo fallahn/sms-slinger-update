@@ -25,10 +25,12 @@
 
 #pragma once
 
-typedef BYTE (*Z80ReadMemory)(WORD) ;
-typedef void (*Z80WriteMemory)(WORD,BYTE) ;
-typedef BYTE (*Z80IOReadMemory)(BYTE) ;
-typedef void (*Z80IOWriteMemory)(BYTE,BYTE) ;
+#include "Config.hpp"
+
+typedef BYTE (*Z80ReadMemory)(WORD);
+typedef void (*Z80WriteMemory)(WORD, BYTE);
+typedef BYTE (*Z80IOReadMemory)(BYTE);
+typedef void (*Z80IOWriteMemory)(BYTE, BYTE);
 
 
 #define FLAG_S 7

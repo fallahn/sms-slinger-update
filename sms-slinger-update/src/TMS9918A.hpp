@@ -61,7 +61,7 @@ public:
     void dumpClockInfo();
     void setGFXOpt(bool useGFXOpt) { m_useGFXOpt = useGFXOpt; }
 
-    const BYTE* getPixelBuffer() const { return m_currentBuffer; }
+    const BYTE* getPixelBuffer() const { return m_buffer.data(); }
 
     static bool screenDisabled;
     static bool frameToggle;
@@ -71,11 +71,8 @@ private:
     std::array<BYTE, 32> m_CRAM = {};
     std::array<BYTE, 16> m_VDPRegisters = {};
 
-    std::array<BYTE, NUM_RES_VERTICAL * NUM_RES_HORIZONTAL * BYTES_PER_CHANNEL> m_screenStandard = {};
-    std::array<BYTE, NUM_RES_VERT_MED * NUM_RES_HORIZONTAL * BYTES_PER_CHANNEL> m_screenMed = {};
-    std::array<BYTE, NUM_RES_VERT_HIGH * NUM_RES_HORIZONTAL * BYTES_PER_CHANNEL> m_screenHigh = {};
-
-    BYTE* m_currentBuffer;
+    //we only need to make one buffer big enough to accept all modes
+    std::array<BYTE, NUM_RES_VERT_HIGH * NUM_RES_HORIZONTAL * BYTES_PER_CHANNEL> m_buffer = {};
 
     float m_runningCycles;
     unsigned int long m_clockInfo;
