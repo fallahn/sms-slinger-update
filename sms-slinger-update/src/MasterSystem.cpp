@@ -69,7 +69,6 @@ namespace
 
     constexpr int WINDOWWIDTH = 256;
     constexpr int WINDOWHEIGHT = 192;
-    constexpr int SCREENSCALE = 1;
 
     SDL_Window* window = nullptr;
     SDL_GLContext ctx = nullptr;
@@ -148,8 +147,8 @@ MasterSystem* MasterSystem::createInstance()
 
 bool MasterSystem::createSDLWindow()
 {
-    m_width = WINDOWWIDTH * SCREENSCALE;
-    m_height = WINDOWHEIGHT * SCREENSCALE;
+    m_width = WINDOWWIDTH;
+    m_height = WINDOWHEIGHT;
 
     if (SDL_Init(SDL_INIT_EVERYTHING) < 0)
     {
@@ -533,8 +532,8 @@ void MasterSystem::renderGame()
 {
     if (TMS9918A::frameToggle && !TMS9918A::screenDisabled)
     {
-        int width = SCREENSCALE * m_emulator->getGraphicChip().getWidth();
-        int height = SCREENSCALE * m_emulator->getGraphicChip().getHeight();
+        int width = m_emulator->getGraphicChip().getWidth();
+        int height = m_emulator->getGraphicChip().getHeight();
 
         if (width != m_width || height != m_height)
         {
@@ -546,29 +545,13 @@ void MasterSystem::renderGame()
         }
 
         //again, assuming we only have one texture that is always bound
-        glTexSubImage2D(GL_TEXTURE_2D, 0, 0, 0, m_width, m_height, GL_RGB, GL_UNSIGNED_BYTE, m_emulator->getGraphicChip().screenStandard);
+        glTexSubImage2D(GL_TEXTURE_2D, 0, 0, 0, m_width, m_height, GL_RGB, GL_UNSIGNED_BYTE, m_emulator->getGraphicChip().getPixelBuffer());
 
         glClear(GL_COLOR_BUFFER_BIT);
 
         glUseProgram(m_shader);
         glBindVertexArray(m_vao);
         glDrawArrays(GL_TRIANGLE_STRIP, 0, 4);
-
-        /*glLoadIdentity();
-        glRasterPos2i(-1, 1);
-        glPixelZoom(1, -1);
-        if (height == SCREENSCALE * TMS9918A::NUM_RES_VERTICAL)
-        {
-            glDrawPixels(m_width, m_height, GL_RGB, GL_UNSIGNED_BYTE, m_emulator->getGraphicChip().screenStandard);
-        }
-        else if (height == SCREENSCALE * TMS9918A::NUM_RES_VERT_MED)
-        {
-            glDrawPixels(m_width, m_height, GL_RGB, GL_UNSIGNED_BYTE, m_emulator->getGraphicChip().screenMed);
-        }
-        else if (height == SCREENSCALE * TMS9918A::NUM_RES_VERT_HIGH)
-        {
-            glDrawPixels(m_width, m_height, GL_RGB, GL_UNSIGNED_BYTE, m_emulator->getGraphicChip().screenHigh);
-        }*/
 
         SDL_GL_SwapWindow(window);
     }

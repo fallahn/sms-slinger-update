@@ -63,7 +63,8 @@ bool TMS9918A::screenDisabled = true;
 bool TMS9918A::frameToggle = true;
 
 TMS9918A::TMS9918A()
-    : m_runningCycles       (0.f),
+    : m_currentBuffer       (m_screenStandard.data()),
+    m_runningCycles         (0.f),
     m_clockInfo             (0),
     m_isPAL                 (true),
     m_numScanlines          (NUM_NTSC_VERTICAL),
@@ -164,14 +165,17 @@ void TMS9918A::update(float nextCycle)
             if (mode == 11)
             {
                 m_height = NUM_RES_VERT_MED;
+                m_currentBuffer = m_screenMed.data();
             }
             else if (mode == 14)
             {
                 m_height = NUM_RES_VERT_HIGH;
+                m_currentBuffer = m_screenHigh.data();
             }
             else
             {
                 m_height = NUM_RES_VERTICAL;
+                m_currentBuffer = m_screenStandard.data();
             }
         }
 
@@ -365,15 +369,18 @@ void TMS9918A::resetScreen()
 
     if (m_height == NUM_RES_VERTICAL)
     {
-        std::memset(screenStandard, SCREENBLANKCOLOUR, sizeof(screenStandard));
+        std::fill(m_screenStandard.begin(), m_screenStandard.end(), SCREENBLANKCOLOUR);
+        m_currentBuffer = m_screenStandard.data();
     }
     else if (m_height == NUM_RES_VERT_MED)
     {
-        std::memset(screenMed, SCREENBLANKCOLOUR, sizeof(screenMed));
+        std::fill(m_screenMed.begin(), m_screenMed.end(), SCREENBLANKCOLOUR);
+        m_currentBuffer = m_screenMed.data();
     }
     else if (m_height == NUM_RES_VERT_HIGH)
     {
-        std::memset(screenHigh, SCREENBLANKCOLOUR, sizeof(screenHigh));
+        std::fill(m_screenHigh.begin(), m_screenHigh.end(), SCREENBLANKCOLOUR);
+        m_currentBuffer = m_screenHigh.data();
     }
 }
 
@@ -1083,40 +1090,16 @@ BYTE TMS9918A::getVDPMode() const
 
 void TMS9918A::writeToScreen(BYTE x, BYTE y,BYTE red, BYTE green, BYTE blue)
 {
-    if (m_height == NUM_RES_VERTICAL)
-    {
-        screenStandard[y][x][0] = red;
-        screenStandard[y][x][1] = green;
-        screenStandard[y][x][2] = blue;
-    }
-    else if (m_height == NUM_RES_VERT_MED)
-    {
-        screenMed[y][x][0] = red;
-        screenMed[y][x][1] = green;
-        screenMed[y][x][2] = blue;
-    }
-    else if (m_height == NUM_RES_VERT_HIGH)
-    {
-        screenHigh[y][x][0] = red;
-        screenHigh[y][x][1] = green;
-        screenHigh[y][x][2] = blue;
-    }
+    auto idx = y * (NUM_RES_HORIZONTAL * BYTES_PER_CHANNEL) + (BYTES_PER_CHANNEL * x);
+    m_currentBuffer[idx] = red;
+    m_currentBuffer[idx+1] = green;
+    m_currentBuffer[idx+2] = blue;
 }
 
 BYTE TMS9918A::getScreenPixelColour(BYTE x, BYTE y, int index) const
 {
-    if (m_height == NUM_RES_VERTICAL)
-    {
-        return screenStandard[y][x][index] ;
-    }
-    else if (m_height == NUM_RES_VERT_MED)
-    {
-        return screenMed[y][x][index] ;
-    }
-    else
-    {
-        return screenHigh[y][x][index] ;
-    }
+    auto idx = y * (NUM_RES_HORIZONTAL * BYTES_PER_CHANNEL) + (BYTES_PER_CHANNEL * x);
+    return m_currentBuffer[idx + index];
 }
 
 BYTE TMS9918A::getVJump() const

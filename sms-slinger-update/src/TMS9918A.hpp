@@ -37,6 +37,7 @@ public:
     static constexpr int NUM_RES_VERT_MED = 224;
     static constexpr int NUM_RES_VERT_HIGH = 240;
     static constexpr int SCREENBLANKCOLOUR = 1;
+    static constexpr int BYTES_PER_CHANNEL = 3;
 
     static constexpr int MACHINE_CLICKS_PER_SCANLINE = 684;
 
@@ -59,10 +60,8 @@ public:
     bool getRefresh();
     void dumpClockInfo();
     void setGFXOpt(bool useGFXOpt) { m_useGFXOpt = useGFXOpt; }
-                    
-    BYTE screenStandard[NUM_RES_VERTICAL][NUM_RES_HORIZONTAL][3];
-    BYTE screenMed[NUM_RES_VERT_MED][NUM_RES_HORIZONTAL][3];
-    BYTE screenHigh[NUM_RES_VERT_HIGH][NUM_RES_HORIZONTAL][3];
+
+    const BYTE* getPixelBuffer() const { return m_currentBuffer; }
 
     static bool screenDisabled;
     static bool frameToggle;
@@ -71,6 +70,12 @@ private:
     std::array<BYTE, 0x4000> m_VRAM = {};
     std::array<BYTE, 32> m_CRAM = {};
     std::array<BYTE, 16> m_VDPRegisters = {};
+
+    std::array<BYTE, NUM_RES_VERTICAL * NUM_RES_HORIZONTAL * BYTES_PER_CHANNEL> m_screenStandard = {};
+    std::array<BYTE, NUM_RES_VERT_MED * NUM_RES_HORIZONTAL * BYTES_PER_CHANNEL> m_screenMed = {};
+    std::array<BYTE, NUM_RES_VERT_HIGH * NUM_RES_HORIZONTAL * BYTES_PER_CHANNEL> m_screenHigh = {};
+
+    BYTE* m_currentBuffer;
 
     float m_runningCycles;
     unsigned int long m_clockInfo;
