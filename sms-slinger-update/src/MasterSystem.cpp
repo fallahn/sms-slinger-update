@@ -29,6 +29,11 @@
 #include "TMS9918A.hpp"
 
 #include "glad.hpp"
+#include "imgui/imgui.h"
+#include "imgui/imgui_impl_sdl.h"
+#include "imgui/imgui_impl_opengl3.h"
+#include "imgui/imgui_style.h"
+#include "imgui/tinyfiledialogs.h"
 
 #include <SDL.h>
 
@@ -107,32 +112,10 @@ MasterSystem::MasterSystem()
     m_shader    (0),
     m_texture   (0),
     m_vao       (0),
-    m_vbo       (0)
+    m_vbo       (0),
+    m_showUI    (true)
 {
     m_emulator = Emulator::createInstance();
-}
-
-MasterSystem::~MasterSystem()
-{
-    if (m_vao)
-    {
-        glDeleteVertexArrays(1, &m_vao);
-    }
-
-    if (m_vbo)
-    {
-        glDeleteBuffers(1, &m_vbo);
-    }
-
-    if (m_shader)
-    {
-        glDeleteProgram(m_shader);
-    }
-
-    if (m_texture)
-    {
-        glDeleteTextures(1, &m_texture);
-    }
 }
 
 //public
@@ -249,6 +232,13 @@ bool MasterSystem::initGL()
     glDisable(GL_DEPTH_TEST);
     glDisable(GL_BLEND);
 
+
+    //set up imgui here while we're at it...
+    ImGui::CreateContext();
+    setImguiStyle(&ImGui::GetStyle());
+    ImGui_ImplSDL2_InitForOpenGL(window, ctx);
+    ImGui_ImplOpenGL3_Init("#version 330");
+
     return true;
 }
 
@@ -318,7 +308,7 @@ bool MasterSystem::loadTexture()
 
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
-    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, m_width, m_height, 0, GL_RGB, GL_UNSIGNED_BYTE, nullptr);
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, m_width, m_height, 0, GL_RGB, GL_UNSIGNED_BYTE, m_emulator->getGraphicChip().getPixelBuffer());
 
 
     glUseProgram(m_shader);
@@ -416,8 +406,7 @@ void MasterSystem::romLoopFixedStep(int fps)
         SDL_QueueAudio(audioDevice, data, size);
     }
 
-    SDL_GL_DeleteContext(ctx);
-    SDL_Quit();
+    shutdown();
 }
 
 void MasterSystem::romLoopFree()
@@ -443,19 +432,29 @@ void MasterSystem::romLoopFree()
         SDL_QueueAudio(audioDevice, data, size);
     }
 
-    SDL_GL_DeleteContext(ctx);
-    SDL_Quit();
+    shutdown();
 }
 
 bool MasterSystem::handleEvent(const SDL_Event& evt)
 {
+    ImGui_ImplSDL2_ProcessEvent(&evt);
+
     if(evt.type == SDL_KEYDOWN)
     {
         int key = -1;
         int player = 0;
         switch (evt.key.keysym.sym)
         {
-        case SDLK_ESCAPE: return true;
+        case SDLK_INSERT:
+            m_showUI = !m_showUI;
+            break;
+        case SDLK_ESCAPE:
+#ifdef SMS_DEBUG
+            return true;
+#else
+            m_showUI = !m_showUI;
+            break;
+#endif //debug
 
         case SDLK_a: key = 4; break;
         case SDLK_s: key = 5; break;
@@ -523,6 +522,11 @@ bool MasterSystem::handleEvent(const SDL_Event& evt)
 
 void MasterSystem::render()
 {
+    doImGui();
+
+    ImGui::Render();
+    glClear(GL_COLOR_BUFFER_BIT);
+
     if (TMS9918A::frameToggle && !TMS9918A::screenDisabled)
     {
         int width = m_emulator->getGraphicChip().getWidth();
@@ -540,13 +544,97 @@ void MasterSystem::render()
 
         //again, assuming we only have one texture that is always bound
         glTexSubImage2D(GL_TEXTURE_2D, 0, 0, 0, m_width, m_height, GL_RGB, GL_UNSIGNED_BYTE, m_emulator->getGraphicChip().getPixelBuffer());
-
-        glClear(GL_COLOR_BUFFER_BIT);
-
-        glUseProgram(m_shader);
-        glBindVertexArray(m_vao);
-        glDrawArrays(GL_TRIANGLE_STRIP, 0, 4);
-
-        SDL_GL_SwapWindow(window);
     }
+
+    glUseProgram(m_shader);
+    glBindVertexArray(m_vao);
+    glDrawArrays(GL_TRIANGLE_STRIP, 0, 4);
+
+    ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
+    SDL_GL_SwapWindow(window);
+}
+
+void MasterSystem::doImGui()
+{
+    ImGui_ImplOpenGL3_NewFrame();
+    ImGui_ImplSDL2_NewFrame(window);
+    ImGui::NewFrame();
+
+    if (m_showUI)
+    {
+        if (ImGui::BeginMainMenuBar())
+        {
+            //file menu
+            if (ImGui::BeginMenu("File"))
+            {
+                if (ImGui::MenuItem("Open", nullptr, nullptr))
+                {
+                    static const char* filters[] = { "*.sms", "*.sg"};
+
+                    auto path = tinyfd_openFileDialog("Open ROM", nullptr, 1, filters, "Master System ROMs", 0);
+                    if (path)
+                    {
+                        //TODO assert file exists
+                        //TODO handle opening failures
+                        startRom(path);
+                        m_showUI = false;
+                    }
+                }
+
+                if (ImGui::MenuItem("Quit", nullptr, nullptr))
+                {
+
+                }
+                ImGui::EndMenu();
+            }
+
+            //view menu
+            if (ImGui::BeginMenu("View"))
+            {
+                if (ImGui::MenuItem("Options", nullptr, nullptr))
+                {
+                    
+                }
+                
+                if (ImGui::MenuItem("Hide UI", nullptr, nullptr))
+                {
+                    m_showUI = false;
+                }
+
+                ImGui::EndMenu();
+            }
+
+            ImGui::EndMainMenuBar();
+        }
+    }
+}
+
+void MasterSystem::shutdown()
+{
+    if (m_vao)
+    {
+        glDeleteVertexArrays(1, &m_vao);
+    }
+
+    if (m_vbo)
+    {
+        glDeleteBuffers(1, &m_vbo);
+    }
+
+    if (m_shader)
+    {
+        glDeleteProgram(m_shader);
+    }
+
+    if (m_texture)
+    {
+        glDeleteTextures(1, &m_texture);
+    }
+
+    ImGui_ImplOpenGL3_Shutdown();
+    ImGui_ImplSDL2_Shutdown();
+    ImGui::DestroyContext();
+
+    SDL_GL_DeleteContext(ctx);
+    SDL_Quit();
 }

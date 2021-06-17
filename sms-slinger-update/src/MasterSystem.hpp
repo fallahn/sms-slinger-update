@@ -34,13 +34,6 @@ class MasterSystem final
 {
 public:
     MasterSystem();
-    ~MasterSystem();
-
-    MasterSystem(MasterSystem&&) = delete;
-    MasterSystem(const MasterSystem&) = delete;
-
-    MasterSystem& operator = (MasterSystem&&) = delete;
-    MasterSystem& operator = (const MasterSystem&) = delete;
 
     bool createSDLWindow();
     void startRom(const char* path);
@@ -59,6 +52,7 @@ private:
     std::uint32_t m_vao;
     std::uint32_t m_vbo;
 
+    bool m_showUI;
 
     bool initGL();
     bool loadShader();
@@ -71,4 +65,7 @@ private:
 
     bool handleEvent(const SDL_Event& event);
     void render();
+    void doImGui();
+
+    void shutdown();
 };

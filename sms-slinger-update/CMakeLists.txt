@@ -42,3 +42,8 @@ add_executable(${PROJECT_NAME} ${PROJECT_SRC})
 target_link_libraries(${PROJECT_NAME}
   ${SDL2_LIBRARY}
   ${OPENGL_LIBRARIES})
+
+#glad needs dl
+if(UNIX AND NOT APPLE)
+  target_link_libraries(${CMAKE_DL_LIBS})
+endif()
