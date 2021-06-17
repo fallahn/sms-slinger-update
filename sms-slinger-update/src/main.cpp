@@ -31,7 +31,7 @@ int main (int, char**)
     if (sms.createSDLWindow())
     {
         sms.startRom("roms/cb01f.sms");
-        sms.beginGame(0);
+        sms.run(0); //TODO how to change this at run time?
     }
     return 0;
 }

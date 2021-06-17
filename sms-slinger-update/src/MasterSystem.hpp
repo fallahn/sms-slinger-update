@@ -45,7 +45,7 @@ public:
     bool createSDLWindow();
     void startRom(const char* path);
     //value < 1 for no sync, else attempts to sync to given frame rate
-    void beginGame(int fps = -1, bool useGfxOpt = false);
+    void run(int fps = -1, bool useGfxOpt = false);
 
 private:
 
@@ -69,6 +69,6 @@ private:
     void romLoopFixedStep(int fps);
     void romLoopFree();
 
-    bool handleInput(const SDL_Event& event);
-    void renderGame();
+    bool handleEvent(const SDL_Event& event);
+    void render();
 };

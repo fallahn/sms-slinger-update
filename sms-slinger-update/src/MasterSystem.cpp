@@ -67,10 +67,10 @@ namespace
             FragColour = texture(u_texture, v_texCoord);
         })";
 
-    constexpr int WINDOWWIDTH = 256;
-    constexpr int WINDOWHEIGHT = 192;
+    constexpr int WINDOW_WIDTH = TMS9918A::NUM_RES_HORIZONTAL;
+    constexpr int WINDOW_HEIGHT = TMS9918A::NUM_RES_VERTICAL;
 
-    constexpr int WINDOWSCALE = 2; //TODO make this a variable
+    constexpr int WINDOW_SCALE = 2; //TODO make this a variable
 
     SDL_Window* window = nullptr;
     SDL_GLContext ctx = nullptr;
@@ -138,8 +138,8 @@ MasterSystem::~MasterSystem()
 //public
 bool MasterSystem::createSDLWindow()
 {
-    m_width = WINDOWWIDTH;
-    m_height = WINDOWHEIGHT;
+    m_width = WINDOW_WIDTH;
+    m_height = WINDOW_HEIGHT;
 
     if (SDL_Init(SDL_INIT_EVERYTHING) < 0)
     {
@@ -149,7 +149,7 @@ bool MasterSystem::createSDLWindow()
 
     window = SDL_CreateWindow("Sega Master System", 
         SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED, 
-        m_width * WINDOWSCALE, m_height * WINDOWSCALE, SDL_WINDOW_SHOWN | SDL_WINDOW_OPENGL/* | SDL_WINDOW_RESIZABLE*/);
+        m_width * WINDOW_SCALE, m_height * WINDOW_SCALE, SDL_WINDOW_SHOWN | SDL_WINDOW_OPENGL);
     
     if (window == nullptr)
     {
@@ -210,7 +210,7 @@ void MasterSystem::startRom(const char* path)
     SDL_PauseAudioDevice(audioDevice, 0);
 }
 
-void MasterSystem::beginGame(int fps, bool useGFXOpt)
+void MasterSystem::run(int fps, bool useGFXOpt)
 {
     m_useGFXOpt = useGFXOpt;
     m_emulator->setGFXOpt(useGFXOpt);
@@ -240,7 +240,7 @@ bool MasterSystem::initGL()
     }
 
 
-    glViewport(0, 0, m_width * WINDOWSCALE, m_height * WINDOWSCALE);
+    glViewport(0, 0, m_width * WINDOW_SCALE, m_height * WINDOW_SCALE);
 
     glClearColor(0.f, 0.f, 1.f, 1.f);
 
@@ -396,7 +396,7 @@ void MasterSystem::romLoopFixedStep(int fps)
         while(SDL_PollEvent(&event)) 
         {
             if (event.type == SDL_QUIT
-                || handleInput(event))
+                || handleEvent(event))
             {
                 quit = true;
             }
@@ -409,7 +409,7 @@ void MasterSystem::romLoopFixedStep(int fps)
             accumulator -= FrameTime;
 
             m_emulator->update();
-            renderGame();
+            render();
         }
 
         auto [data, size] = m_emulator->getSoundChip().getSamples();
@@ -430,14 +430,14 @@ void MasterSystem::romLoopFree()
         while (SDL_PollEvent(&event))
         {
             if (event.type == SDL_QUIT
-                || handleInput(event))
+                || handleEvent(event))
             {
                 quit = true;
             }
         }
 
         m_emulator->update();
-        renderGame();
+        render();
 
         auto [data, size] = m_emulator->getSoundChip().getSamples();
         SDL_QueueAudio(audioDevice, data, size);
@@ -447,7 +447,7 @@ void MasterSystem::romLoopFree()
     SDL_Quit();
 }
 
-bool MasterSystem::handleInput(const SDL_Event& evt)
+bool MasterSystem::handleEvent(const SDL_Event& evt)
 {
     if(evt.type == SDL_KEYDOWN)
     {
@@ -505,6 +505,8 @@ bool MasterSystem::handleInput(const SDL_Event& evt)
         {
             m_emulator->setKeyReleased(player, key);
         }
+
+
     }
     else if (evt.type == SDL_WINDOWEVENT)
     {
@@ -519,7 +521,7 @@ bool MasterSystem::handleInput(const SDL_Event& evt)
     return false;
 }
 
-void MasterSystem::renderGame()
+void MasterSystem::render()
 {
     if (TMS9918A::frameToggle && !TMS9918A::screenDisabled)
     {
@@ -530,7 +532,7 @@ void MasterSystem::renderGame()
         {
             m_width = width;
             m_height = height;
-            SDL_SetWindowSize(window, m_width * WINDOWSCALE, m_height * WINDOWSCALE);
+            SDL_SetWindowSize(window, m_width * WINDOW_SCALE, m_height * WINDOW_SCALE);
 
             //resize texture
             glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, m_width, m_height, 0, GL_RGB, GL_UNSIGNED_BYTE, nullptr);
