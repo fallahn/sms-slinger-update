@@ -25,8 +25,7 @@
 
 #pragma once
 
-#include <SDL.h>
-#include <SDL_opengl.h>
+#include <SDL_events.h>
 
 #include <memory>
 
@@ -40,9 +39,8 @@ public:
 
     bool createSDLWindow();
     void startRom(const char* path);
-    //-1 for no sync, else attempts to sync to given frame rate
+    //value < 1 for no sync, else attempts to sync to given frame rate
     void beginGame(int fps = -1, bool useGfxOpt = false);
-    unsigned char getMemoryByte(int i);
 
 private:
     static std::unique_ptr<MasterSystem> m_instance;

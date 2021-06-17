@@ -28,6 +28,9 @@
 #include "Emulator.hpp"
 #include "TMS9918A.hpp"
 
+#include <SDL.h>
+#include <SDL_OpenGL.h>
+
 #include <iostream>
 #include <cassert>
 
@@ -89,18 +92,21 @@ bool MasterSystem::createSDLWindow()
 {
     m_width = WINDOWWIDTH * SCREENSCALE;
     m_height = WINDOWHEIGHT * SCREENSCALE;
-    if(SDL_Init(SDL_INIT_EVERYTHING) < 0)
+
+    if (SDL_Init(SDL_INIT_EVERYTHING) < 0)
     {
+        std::cout << SDL_GetError() << std::endl;
         return false;
     }
 
     window = SDL_CreateWindow("Sega Master System", 
         SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED, 
-        m_width, m_height, SDL_WINDOW_SHOWN | SDL_WINDOW_OPENGL);
+        m_width, m_height, SDL_WINDOW_SHOWN | SDL_WINDOW_OPENGL | SDL_WINDOW_RESIZABLE);
     
     if (window == nullptr)
     {
         std::cout << SDL_GetError() << std::endl;
+        SDL_Quit();
         return false;
     }
 
@@ -108,8 +114,10 @@ bool MasterSystem::createSDLWindow()
     if (ctx == nullptr)
     {
         std::cout << SDL_GetError() << std::endl;
+        SDL_Quit();
         return false;
     }
+
 
     initGL();
     initAudio();
@@ -118,7 +126,6 @@ bool MasterSystem::createSDLWindow()
 
 void MasterSystem::startRom(const char* path)
 {
-    //TODO fix pausing audio device, causes a crash in release mode
     SDL_PauseAudioDevice(audioDevice, 1);
 
     m_emulator->reset();
@@ -135,26 +142,20 @@ void MasterSystem::beginGame(int fps, bool useGFXOpt)
     fps > 0 ? romLoopFixedStep(fps) : romLoopFree();
 }
 
-unsigned char MasterSystem::getMemoryByte(int i)
-{
-    return m_emulator->readMemory(i);
-}
-
 //private
 void MasterSystem::initGL()
 {
     glViewport(0, 0, m_width, m_height);
+
+    glClearColor(0.f, 0.f, 1.f, 1.f);
+    glClear(GL_COLOR_BUFFER_BIT);
     glMatrixMode(GL_MODELVIEW);
     glLoadIdentity();
     glOrtho(0, m_width, m_height, 0, -1.0, 1.0);
-    glClearColor(0.f, 0.f, 1.f, 1.f);
-    glClear(GL_COLOR_BUFFER_BIT);
-    glShadeModel(GL_FLAT);
 
     glEnable(GL_TEXTURE_2D);
+    glEnable(GL_CULL_FACE);
     glDisable(GL_DEPTH_TEST);
-    glDisable(GL_CULL_FACE);
-    glDisable(GL_DITHER);
     glDisable(GL_BLEND);
 }
 
@@ -171,6 +172,7 @@ void MasterSystem::initAudio()
     //as.userdata = &m_emulator->getSoundChip();
 
     audioDevice = SDL_OpenAudioDevice(nullptr, 0, &as, nullptr, 0);
+    SDL_PauseAudioDevice(audioDevice, 1);
 }
 
 void MasterSystem::romLoopFixedStep(int fps)
@@ -239,13 +241,13 @@ void MasterSystem::romLoopFree()
     SDL_Quit();
 }
 
-bool MasterSystem::handleInput(const SDL_Event& event)
+bool MasterSystem::handleInput(const SDL_Event& evt)
 {
-    if(event.type == SDL_KEYDOWN)
+    if(evt.type == SDL_KEYDOWN)
     {
         int key = -1;
         int player = 0;
-        switch (event.key.keysym.sym)
+        switch (evt.key.keysym.sym)
         {
         case SDLK_ESCAPE: return true;
 
@@ -271,11 +273,11 @@ bool MasterSystem::handleInput(const SDL_Event& event)
         }
     }
     //If a key was released
-    else if(event.type == SDL_KEYUP)
+    else if(evt.type == SDL_KEYUP)
     {
         int key = -1;
         int player = 0;
-        switch(event.key.keysym.sym)
+        switch(evt.key.keysym.sym)
         {
         case SDLK_a: key = 4; break;
         case SDLK_s: key = 5; break;
@@ -298,6 +300,16 @@ bool MasterSystem::handleInput(const SDL_Event& event)
             m_emulator->setKeyReleased(player, key);
         }
     }
+    else if (evt.type == SDL_WINDOWEVENT)
+    {
+        if (evt.window.event == SDL_WINDOWEVENT_RESIZED)
+        {
+            auto w = evt.window.data1;
+            auto h = evt.window.data2;
+
+        }
+    }
+
     return false;
 }
 
