@@ -307,7 +307,8 @@ BYTE TMS9918A::readDataPort()
 
     BYTE res = m_readBuffer;
 
-    switch (getCodeRegister())
+    auto reg = getCodeRegister();
+    switch (reg)
     {
         case 0: m_readBuffer = m_VRAM[getAddressRegister()]; break; // not sure about this one
         case 1: m_readBuffer = m_VRAM[getAddressRegister()]; break;

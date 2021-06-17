@@ -459,7 +459,7 @@ void Emulator::resetButton()
         context->m_NMI = true;
     }
 
-    setKeyPressed(1, 4);
+    setKeyPressed(0, 4);
 }
 
 void Emulator::dumpClockInfo()

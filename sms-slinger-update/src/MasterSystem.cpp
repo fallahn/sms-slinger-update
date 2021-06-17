@@ -70,6 +70,8 @@ namespace
     constexpr int WINDOWWIDTH = 256;
     constexpr int WINDOWHEIGHT = 192;
 
+    constexpr int WINDOWSCALE = 2; //TODO make this a variable
+
     SDL_Window* window = nullptr;
     SDL_GLContext ctx = nullptr;
     SDL_AudioDeviceID audioDevice = 0;
@@ -158,7 +160,7 @@ bool MasterSystem::createSDLWindow()
 
     window = SDL_CreateWindow("Sega Master System", 
         SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED, 
-        m_width, m_height, SDL_WINDOW_SHOWN | SDL_WINDOW_OPENGL | SDL_WINDOW_RESIZABLE);
+        m_width * WINDOWSCALE, m_height * WINDOWSCALE, SDL_WINDOW_SHOWN | SDL_WINDOW_OPENGL/* | SDL_WINDOW_RESIZABLE*/);
     
     if (window == nullptr)
     {
@@ -249,7 +251,7 @@ bool MasterSystem::initGL()
     }
 
 
-    glViewport(0, 0, m_width, m_height);
+    glViewport(0, 0, m_width * WINDOWSCALE, m_height * WINDOWSCALE);
 
     glClearColor(0.f, 0.f, 1.f, 1.f);
 
@@ -500,7 +502,7 @@ bool MasterSystem::handleInput(const SDL_Event& evt)
         case SDLK_LEFT: key = 2; break;
         case SDLK_UP: key = 0; break;
         case SDLK_DOWN: key = 1; break;
-        case SDLK_BACKSPACE : key = 4; player = 2;break;
+        case SDLK_BACKSPACE : key = 4; player = 1;break;
         case SDLK_KP_4: player = 1; key = 0; break; // left
         case SDLK_KP_6: player = 1; key = 1; break; // right
         case SDLK_KP_7: player = 1; key = 2; break; // fire a
@@ -521,7 +523,7 @@ bool MasterSystem::handleInput(const SDL_Event& evt)
         {
             auto w = evt.window.data1;
             auto h = evt.window.data2;
-
+            glViewport(0, 0, w, h);
         }
     }
 
@@ -539,9 +541,10 @@ void MasterSystem::renderGame()
         {
             m_width = width;
             m_height = height;
-            SDL_SetWindowSize(window, m_width, m_height);
+            SDL_SetWindowSize(window, m_width * WINDOWSCALE, m_height * WINDOWSCALE);
 
-            //TODO resize texture
+            //resize texture
+            glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, m_width, m_height, 0, GL_RGB, GL_UNSIGNED_BYTE, nullptr);
         }
 
         //again, assuming we only have one texture that is always bound
