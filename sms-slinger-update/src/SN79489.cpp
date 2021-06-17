@@ -222,7 +222,7 @@ void SN79489::update(float cyclesMac)
             continue;
         }
 
-        m_counters[i]-= static_cast<int>(floor);
+        m_counters[i] -= static_cast<int>(floor);
 
         if (m_counters[i] <= 0)
         {
@@ -277,7 +277,6 @@ void SN79489::update(float cyclesMac)
             m_buffer[m_currentBufferPos] = tone;
         }
             
-        //m_currentBufferPos++;
         m_currentBufferPos = (m_currentBufferPos + 1) % BUFFERSIZE;
         m_bufferUpdateCount = m_updateBufferLimit - m_bufferUpdateCount;       
     }       

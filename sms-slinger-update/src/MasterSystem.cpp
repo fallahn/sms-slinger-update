@@ -113,7 +113,8 @@ MasterSystem::MasterSystem()
     m_texture   (0),
     m_vao       (0),
     m_vbo       (0),
-    m_showUI    (true)
+    m_showUI    (true),
+    m_running   (false)
 {
     m_emulator = Emulator::createInstance();
 }
@@ -183,12 +184,15 @@ bool MasterSystem::createSDLWindow()
     return true;
 }
 
-void MasterSystem::startRom(const char* path)
+void MasterSystem::startRom(const std::string& path)
 {
+    SDL_ClearQueuedAudio(audioDevice);
     SDL_PauseAudioDevice(audioDevice, 1);
 
     m_emulator->reset();
-    m_emulator->insertCartridge(path);
+    m_emulator->insertCartridge(path.c_str());
+
+    m_currentRom = path;
 
     SDL_PauseAudioDevice(audioDevice, 0);
 }
@@ -374,22 +378,18 @@ void MasterSystem::initAudio()
 void MasterSystem::romLoopFixedStep(int fps)
 {
     assert(fps > 0);
-    bool quit = false;
+    m_running = true;
 
     HiResTimer timer;
     const float FrameTime = 1.f / fps;
     float accumulator = 0.f;
 
-    while (!quit)
+    while (m_running)
     {
-        SDL_Event event;
-        while(SDL_PollEvent(&event)) 
+        SDL_Event evt;
+        while(SDL_PollEvent(&evt)) 
         {
-            if (event.type == SDL_QUIT
-                || handleEvent(event))
-            {
-                quit = true;
-            }
+            m_running = !(evt.type == SDL_QUIT || handleEvent(evt));
         }
 
         accumulator += timer.restart();
@@ -411,18 +411,14 @@ void MasterSystem::romLoopFixedStep(int fps)
 
 void MasterSystem::romLoopFree()
 {
-    bool quit = false;
+    m_running = true;
 
-    while (!quit)
+    while (m_running)
     {
-        SDL_Event event;
-        while (SDL_PollEvent(&event))
+        SDL_Event evt;
+        while (SDL_PollEvent(&evt))
         {
-            if (event.type == SDL_QUIT
-                || handleEvent(event))
-            {
-                quit = true;
-            }
+            m_running = !(evt.type == SDL_QUIT || handleEvent(evt));
         }
 
         m_emulator->update();
@@ -581,9 +577,17 @@ void MasterSystem::doImGui()
                     }
                 }
 
+                if (ImGui::MenuItem("Reset", nullptr, nullptr))
+                {
+                    if (!m_currentRom.empty())
+                    {
+                        startRom(m_currentRom);
+                    }
+                }
+
                 if (ImGui::MenuItem("Quit", nullptr, nullptr))
                 {
-
+                    m_running = false;
                 }
                 ImGui::EndMenu();
             }

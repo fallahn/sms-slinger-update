@@ -30,8 +30,8 @@ int main (int, char**)
     MasterSystem sms;
     if (sms.createSDLWindow())
     {
-        //sms.startRom("roms/cb01f.sms");
-        sms.run(0); //TODO how to change this at run time?
+        //sms.startRom("roms/VDPTEST.sms");
+        sms.run(0);
     }
     return 0;
 }

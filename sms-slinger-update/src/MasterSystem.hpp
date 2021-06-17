@@ -28,6 +28,7 @@
 #include <SDL_events.h>
 
 #include <memory>
+#include <string>
 
 class Emulator;
 class MasterSystem final
@@ -36,7 +37,7 @@ public:
     MasterSystem();
 
     bool createSDLWindow();
-    void startRom(const char* path);
+    void startRom(const std::string& path);
     //value < 1 for no sync, else attempts to sync to given frame rate
     void run(int fps = -1, bool useGfxOpt = false);
 
@@ -53,6 +54,8 @@ private:
     std::uint32_t m_vbo;
 
     bool m_showUI;
+    bool m_running;
+    std::string m_currentRom;
 
     bool initGL();
     bool loadShader();
