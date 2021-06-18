@@ -92,28 +92,6 @@ void main()
     SDL_Window* window = nullptr;
     SDL_GLContext ctx = nullptr;
     SDL_AudioDeviceID audioDevice = 0;
-
-    class HiResTimer final
-    {
-    public:
-        HiResTimer()
-        {
-            m_start = m_current = SDL_GetPerformanceCounter();
-            m_frequency = SDL_GetPerformanceFrequency();
-        }
-
-        float restart()
-        {
-            m_start = m_current;
-            m_current = SDL_GetPerformanceCounter();
-            return static_cast<float>(m_current - m_start) / static_cast<float>(m_frequency);
-        }
-
-    private:
-        Uint64 m_start = 0;
-        Uint64 m_current = 0;
-        Uint64 m_frequency = 0;
-    };
 }
 
 MasterSystem::MasterSystem()
@@ -215,6 +193,7 @@ void MasterSystem::startRom(const std::string& path)
 
     SDL_PauseAudioDevice(audioDevice, 0);
     SDL_ClearQueuedAudio(audioDevice);
+    m_updateTimer.restart();
 }
 
 void MasterSystem::run(int fps, bool useGFXOpt)
@@ -435,7 +414,6 @@ void MasterSystem::romLoopFixedStep(int fps)
     assert(fps > 0);
     m_running = true;
 
-    HiResTimer timer;
     const float FrameTime = 1.f / fps;
     float accumulator = 0.f;
 
@@ -447,7 +425,7 @@ void MasterSystem::romLoopFixedStep(int fps)
             m_running = !(evt.type == SDL_QUIT || handleEvent(evt));
         }
 
-        accumulator += timer.restart();
+        accumulator += m_updateTimer.restart();
 
         while (accumulator > FrameTime)
         {

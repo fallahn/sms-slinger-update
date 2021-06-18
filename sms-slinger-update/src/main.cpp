@@ -31,7 +31,7 @@ int main (int, char**)
     if (sms.createSDLWindow())
     {
         //sms.startRom("roms/VDPTEST.sms");
-        sms.run(0);
+        sms.run(60);
     }
     return 0;
 }
