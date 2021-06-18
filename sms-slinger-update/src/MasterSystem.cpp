@@ -27,6 +27,7 @@
 #include "MasterSystem.hpp"
 #include "Emulator.hpp"
 #include "TMS9918A.hpp"
+#include "ConfigFile.hpp"
 
 #include "glad.hpp"
 #include "imgui/imgui.h"
@@ -86,6 +87,7 @@ void main()
 
     constexpr int WINDOW_WIDTH = TMS9918A::NUM_RES_HORIZONTAL;
     constexpr int WINDOW_HEIGHT = TMS9918A::NUM_RES_VERTICAL;
+    bool fullScreen = false; //kludge to allow settings file to set this before window created.
 
     SDL_Window* window = nullptr;
     SDL_GLContext ctx = nullptr;
@@ -130,6 +132,8 @@ MasterSystem::MasterSystem()
     m_running       (false)
 {
     m_emulator = Emulator::createInstance();
+
+    loadSettings();
 }
 
 //public
@@ -154,7 +158,10 @@ bool MasterSystem::createSDLWindow()
         SDL_Quit();
         return false;
     }
-
+    if (fullScreen)
+    {
+        SDL_SetWindowFullscreen(window, SDL_WINDOW_FULLSCREEN_DESKTOP);
+    }
 
     //for some reason this has to be done first on macOS
 #ifdef __APPLE__
@@ -221,7 +228,26 @@ void MasterSystem::run(int fps, bool useGFXOpt)
 //private
 bool MasterSystem::initGL()
 {
-    if (!loadShader(Fragment))
+    if (!m_currentShaderPath.empty())
+    {
+        std::ifstream file(m_currentShaderPath);
+        if (file.is_open() && file.good())
+        {
+            std::string str((std::istreambuf_iterator<char>(file)), std::istreambuf_iterator<char>());
+        
+            if (!loadShader(str))
+            {
+                if (!loadShader(Fragment))
+                {
+                    std::cout << "Failed to create Shader!" << std::endl;
+                    file.close();
+                    return false;
+                }
+            }
+        }
+        file.close();
+    }
+    else if (!loadShader(Fragment))
     {
         std::cout << "Failed to create Shader!" << std::endl;
         return false;
@@ -688,10 +714,9 @@ void MasterSystem::doImGui()
                 glViewport(0, 0, w, h);
             }
 
-            static bool fullscreen = false;
-            if (ImGui::Checkbox("Full Screen", &fullscreen))
+            if (ImGui::Checkbox("Full Screen", &fullScreen))
             {
-                if (fullscreen)
+                if (fullScreen)
                 {
                     SDL_SetWindowFullscreen(window, SDL_WINDOW_FULLSCREEN_DESKTOP);
                     //TODO letterbox this properly
@@ -736,6 +761,7 @@ void MasterSystem::doImGui()
             if (ImGui::Button("Reset To Default"))
             {
                 loadShader(Fragment);
+                m_currentShaderPath.clear();
             }
             ImGui::SameLine();
             if (ImGui::Button("Shader Editor"))
@@ -748,8 +774,29 @@ void MasterSystem::doImGui()
 
         if (ImGui::BeginTabItem("Audio"))
         {
-            ImGui::Text("TODO: channel selection");
-            ImGui::Text("TODO: Volume");
+            static bool tone1 = true;
+            if (ImGui::Checkbox("Tone 1", &tone1))
+            {
+                std::cout << "implement me!" << std::endl;
+            }
+
+            static bool tone2 = true;
+            if (ImGui::Checkbox("Tone 2", &tone2))
+            {
+                std::cout << "implement me!" << std::endl;
+            }
+
+            static bool tone3 = true;
+            if (ImGui::Checkbox("Tone 3", &tone3))
+            {
+                std::cout << "implement me!" << std::endl;
+            }
+            
+            static float vol = 1.f;
+            if (ImGui::SliderFloat("Volume", &vol, 0.f, 1.f))
+            {
+                std::cout << "implement me!" << std::endl;
+            }
 
             ImGui::EndTabItem();
         }
@@ -769,6 +816,7 @@ void MasterSystem::doImGui()
         if (!m_showOptions)
         {
             //window was closed - save options
+            saveSettings();
         }
     }
 
@@ -877,8 +925,8 @@ void MasterSystem::shaderEditor()
                     std::ofstream file(m_currentShaderPath);
                     if (file.is_open() && file.good())
                     {
-                        auto str = m_textEditor.GetText();
-                        file.write(str.c_str(), str.size());
+                    auto str = m_textEditor.GetText();
+                    file.write(str.c_str(), str.size());
                     }
                     file.close();
                 }
@@ -967,6 +1015,51 @@ void MasterSystem::shaderEditor()
     m_textEditor.Render("TextEditor"); //we have to do this last as apparently there is no way to set its size
 
     ImGui::End();
+}
+
+void MasterSystem::loadSettings()
+{
+    ConfigFile cfg;
+    if (cfg.loadFromFile("settings.cfg"))
+    {
+        const auto properties = cfg.getProperties();
+        for( const auto& prop : properties)
+        {
+            const auto& name = prop.getName();
+            if (name == "window_scale")
+            {
+                m_windowScale = std::max(1, std::min(8, prop.getValue<std::int32_t>()));
+                //this ought to be loaded before window creation so no need to apply
+            }
+            else if (name == "full_screen")
+            {
+                fullScreen = prop.getValue<bool>();
+            }
+            else if (name == "active_shader")
+            {
+                m_currentShaderPath = prop.getValue<std::string>();
+            }
+
+            //TODO audio settings
+            //TODO keybinds
+        }
+    }
+}
+
+void MasterSystem::saveSettings()
+{
+    ConfigFile cfg("settings");
+    cfg.addProperty("window_scale").setValue(m_windowScale);
+    cfg.addProperty("full_screen").setValue(fullScreen);
+    if (!m_currentShaderPath.empty())
+    {
+        cfg.addProperty("active_shader").setValue(m_currentShaderPath);
+    }
+
+    //TODO audio settings
+    //TODO keybinds
+
+    cfg.save("settings.cfg");
 }
 
 void MasterSystem::shutdown()

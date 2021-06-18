@@ -149,8 +149,8 @@
   </ItemDefinitionGroup>
   <ItemGroup>
     <ClInclude Include="src\Config.hpp" />
+    <ClInclude Include="src\ConfigFile.hpp" />
     <ClInclude Include="src\Emulator.hpp" />
-    <ClInclude Include="src\GameSettings.hpp" />
     <ClInclude Include="src\glad.hpp" />
     <ClInclude Include="src\imgui\imconfig.h" />
     <ClInclude Include="src\imgui\imgui.h" />
@@ -174,8 +174,8 @@
     <ClInclude Include="src\Z80.Opcodes.hpp" />
   </ItemGroup>
   <ItemGroup>
+    <ClCompile Include="src\ConfigFile.cpp" />
     <ClCompile Include="src\Emulator.cpp" />
-    <ClCompile Include="src\GameSettings.cpp" />
     <ClCompile Include="src\glad.c" />
     <ClCompile Include="src\imgui\imgui.cpp" />
     <ClCompile Include="src\imgui\imgui_demo.cpp" />
@@ -194,6 +194,9 @@
     <ClCompile Include="src\TMS9918A.cpp" />
     <ClCompile Include="src\Z80.cpp" />
     <ClCompile Include="src\Z80.JumpTable.cpp" />
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="src\ConfigFile.inl" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">

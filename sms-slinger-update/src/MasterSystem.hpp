@@ -81,5 +81,8 @@ private:
     void browseRom();
     void shaderEditor();
 
+    void loadSettings();
+    void saveSettings();
+
     void shutdown();
 };

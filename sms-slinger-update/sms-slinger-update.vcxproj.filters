@@ -27,9 +27,6 @@
     <ClInclude Include="src\Emulator.hpp">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="src\GameSettings.hpp">
-      <Filter>Header Files</Filter>
-    </ClInclude>
     <ClInclude Include="src\LogMessages.hpp">
       <Filter>Header Files</Filter>
     </ClInclude>
@@ -93,12 +90,12 @@
     <ClInclude Include="src\imgui\TextEditor.h">
       <Filter>Header Files\imgui</Filter>
     </ClInclude>
+    <ClInclude Include="src\ConfigFile.hpp">
+      <Filter>Header Files</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="src\Emulator.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="src\GameSettings.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="src\main.cpp">
@@ -155,5 +152,13 @@
     <ClCompile Include="src\imgui\TextEditor.cpp">
       <Filter>Source Files\imgui</Filter>
     </ClCompile>
+    <ClCompile Include="src\ConfigFile.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="src\ConfigFile.inl">
+      <Filter>Header Files</Filter>
+    </None>
   </ItemGroup>
 </Project>
