@@ -48,6 +48,7 @@ private:
     Emulator* m_emulator;
     int m_width;
     int m_height;
+    int m_windowScale;
     bool m_useGFXOpt;
 
     std::uint32_t m_shader;

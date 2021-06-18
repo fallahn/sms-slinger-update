@@ -87,8 +87,6 @@ void main()
     constexpr int WINDOW_WIDTH = TMS9918A::NUM_RES_HORIZONTAL;
     constexpr int WINDOW_HEIGHT = TMS9918A::NUM_RES_VERTICAL;
 
-    constexpr int WINDOW_SCALE = 4; //TODO make this a variable
-
     SDL_Window* window = nullptr;
     SDL_GLContext ctx = nullptr;
     SDL_AudioDeviceID audioDevice = 0;
@@ -120,6 +118,7 @@ MasterSystem::MasterSystem()
     : m_emulator    (nullptr),
     m_width         (0),
     m_height        (0),
+    m_windowScale   (1),
     m_useGFXOpt     (false),
     m_shader        (0),
     m_texture       (0),
@@ -147,7 +146,7 @@ bool MasterSystem::createSDLWindow()
 
     window = SDL_CreateWindow("Sega Master System", 
         SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED, 
-        m_width * WINDOW_SCALE, m_height * WINDOW_SCALE, SDL_WINDOW_SHOWN | SDL_WINDOW_OPENGL);
+        m_width * m_windowScale, m_height * m_windowScale, SDL_WINDOW_SHOWN | SDL_WINDOW_OPENGL);
     
     if (window == nullptr)
     {
@@ -241,7 +240,7 @@ bool MasterSystem::initGL()
     }
 
 
-    glViewport(0, 0, m_width * WINDOW_SCALE, m_height * WINDOW_SCALE);
+    glViewport(0, 0, m_width * m_windowScale, m_height * m_windowScale);
 
     glClearColor(0.f, 0.f, 1.f, 1.f);
 
@@ -427,10 +426,9 @@ void MasterSystem::romLoopFixedStep(int fps)
         while (accumulator > FrameTime)
         {
             accumulator -= FrameTime;
-
             m_emulator->update();
-            render();
         }
+        render();
 
         auto [data, size] = m_emulator->getSoundChip().getSamples();
         SDL_QueueAudio(audioDevice, data, size);
@@ -591,7 +589,11 @@ void MasterSystem::render()
         {
             m_width = width;
             m_height = height;
-            SDL_SetWindowSize(window, m_width * WINDOW_SCALE, m_height * WINDOW_SCALE);
+
+            auto w = m_width * m_windowScale;
+            auto h = m_height * m_windowScale;
+            SDL_SetWindowSize(window, w, h);
+            glViewport(0, 0, w, h);
 
             //resize texture
             glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, m_width, m_height, 0, GL_RGB, GL_UNSIGNED_BYTE, nullptr);
@@ -667,15 +669,45 @@ void MasterSystem::doImGui()
 
     if (m_showOptions)
     {
-        ImGui::SetNextWindowSize({ 340.f, 200.f });
+        ImGui::SetNextWindowSize({ 340.f, 210.f });
         ImGui::Begin("Options", &m_showOptions, ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoCollapse);
         ImGui::BeginTabBar("##0");
 
         if (ImGui::BeginTabItem("Video"))
         {
-            ImGui::Text("TODO: Screen size");
-            ImGui::Text("TODO: Full screen toggle");
-            ImGui::Text("TODO: VSync toggle");
+            ImGui::Text("Application average %.3f ms/frame (%.1f FPS)", 1000.0f / ImGui::GetIO().Framerate, ImGui::GetIO().Framerate);
+            ImGui::NewLine();
+
+            if (ImGui::InputInt("Screen Size", &m_windowScale))
+            {
+                m_windowScale = std::max(1, std::min(8, m_windowScale));
+
+                auto w = m_width * m_windowScale;
+                auto h = m_height * m_windowScale;
+                SDL_SetWindowSize(window, w, h);
+                glViewport(0, 0, w, h);
+            }
+
+            static bool fullscreen = false;
+            if (ImGui::Checkbox("Full Screen", &fullscreen))
+            {
+                if (fullscreen)
+                {
+                    SDL_SetWindowFullscreen(window, SDL_WINDOW_FULLSCREEN_DESKTOP);
+                    //TODO letterbox this properly
+                }
+                else
+                {
+                    SDL_SetWindowFullscreen(window, 0);
+                    glViewport(0, 0, m_width * m_windowScale, m_height * m_windowScale);
+                }
+            }
+
+            bool vsync = SDL_GL_GetSwapInterval() == 1;
+            if (ImGui::Checkbox("V-Sync", &vsync))
+            {
+                SDL_GL_SetSwapInterval(vsync);
+            }
             
             ImGui::NewLine();
             if (ImGui::Button("Load Shader"))
