@@ -25,6 +25,8 @@
 
 #pragma once
 
+#include "imgui/TextEditor.h"
+
 #include <SDL_events.h>
 
 #include <memory>
@@ -54,11 +56,16 @@ private:
     std::uint32_t m_vbo;
 
     bool m_showUI;
+    bool m_showOptions;
+    bool m_showEditor;
     bool m_running;
     std::string m_currentRom;
 
+    TextEditor m_textEditor;
+    std::string m_currentShaderPath;
+
     bool initGL();
-    bool loadShader();
+    bool loadShader(const std::string&);
     bool loadTexture();
     bool loadQuad();
     void initAudio();
@@ -69,6 +76,9 @@ private:
     bool handleEvent(const SDL_Event& event);
     void render();
     void doImGui();
+
+    void browseRom();
+    void shaderEditor();
 
     void shutdown();
 };

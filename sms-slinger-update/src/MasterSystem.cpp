@@ -38,44 +38,56 @@
 #include <SDL.h>
 
 #include <iostream>
+#include <fstream>
 #include <cassert>
 
 namespace
 {
     const std::string Vertex = 
-        R"(
-        #version 330 core
+R"(
+#version 330 core
 
-        layout (location = 0) in vec2 a_position;
-        layout (location = 1) in vec2 a_texCoord;
+layout (location = 0) in vec2 a_position;
+layout (location = 1) in vec2 a_texCoord;
 
-        out vec2 v_texCoord;
+out vec2 v_texCoord;
 
-        void main()
-        {
-            v_texCoord = a_texCoord;
-            gl_Position = vec4(a_position.x, a_position.y, 0.0, 1.0);
-        })";
+void main()
+{
+    v_texCoord = a_texCoord;
+    gl_Position = vec4(a_position.x, a_position.y, 0.0, 1.0);
+})";
 
     const std::string Fragment = 
-        R"(
-        #version 330 core
+R"(
+#version 330 core
 
-        uniform sampler2D u_texture;
+uniform sampler2D u_texture;
 
-        in vec2 v_texCoord;
+in vec2 v_texCoord;
 
-        out vec4 FragColour;
+out vec4 FragColour;
 
-        void main()
-        {
-            FragColour = texture(u_texture, v_texCoord);
-        })";
+void main()
+{
+    vec4 colour = texture(u_texture, v_texCoord);
+
+    //process the colour fragment here...
+
+    FragColour = colour;
+})";
+
+    std::string shaderError;
+
+    enum DialogResult
+    {
+        Cancel, Yes, No
+    };
 
     constexpr int WINDOW_WIDTH = TMS9918A::NUM_RES_HORIZONTAL;
     constexpr int WINDOW_HEIGHT = TMS9918A::NUM_RES_VERTICAL;
 
-    constexpr int WINDOW_SCALE = 2; //TODO make this a variable
+    constexpr int WINDOW_SCALE = 4; //TODO make this a variable
 
     SDL_Window* window = nullptr;
     SDL_GLContext ctx = nullptr;
@@ -105,16 +117,18 @@ namespace
 }
 
 MasterSystem::MasterSystem()
-    : m_emulator(nullptr),
-    m_width     (0),
-    m_height    (0),
-    m_useGFXOpt (false),
-    m_shader    (0),
-    m_texture   (0),
-    m_vao       (0),
-    m_vbo       (0),
-    m_showUI    (true),
-    m_running   (false)
+    : m_emulator    (nullptr),
+    m_width         (0),
+    m_height        (0),
+    m_useGFXOpt     (false),
+    m_shader        (0),
+    m_texture       (0),
+    m_vao           (0),
+    m_vbo           (0),
+    m_showUI        (true),
+    m_showOptions   (false),
+    m_showEditor    (false),
+    m_running       (false)
 {
     m_emulator = Emulator::createInstance();
 }
@@ -186,7 +200,6 @@ bool MasterSystem::createSDLWindow()
 
 void MasterSystem::startRom(const std::string& path)
 {
-    SDL_ClearQueuedAudio(audioDevice);
     SDL_PauseAudioDevice(audioDevice, 1);
 
     m_emulator->reset();
@@ -195,6 +208,7 @@ void MasterSystem::startRom(const std::string& path)
     m_currentRom = path;
 
     SDL_PauseAudioDevice(audioDevice, 0);
+    SDL_ClearQueuedAudio(audioDevice);
 }
 
 void MasterSystem::run(int fps, bool useGFXOpt)
@@ -208,7 +222,7 @@ void MasterSystem::run(int fps, bool useGFXOpt)
 //private
 bool MasterSystem::initGL()
 {
-    if (!loadShader())
+    if (!loadShader(Fragment))
     {
         std::cout << "Failed to create Shader!" << std::endl;
         return false;
@@ -243,10 +257,13 @@ bool MasterSystem::initGL()
     ImGui_ImplSDL2_InitForOpenGL(window, ctx);
     ImGui_ImplOpenGL3_Init("#version 330");
 
+    m_textEditor.SetLanguageDefinition(TextEditor::LanguageDefinition::GLSL());
+    m_textEditor.SetText(Fragment);
+
     return true;
 }
 
-bool MasterSystem::loadShader()
+bool MasterSystem::loadShader(const std::string& fragString)
 {
     //vert shader
     const char* vertSrc = Vertex.c_str();
@@ -264,27 +281,33 @@ bool MasterSystem::loadShader()
     }
 
     //frag shader
-    const char* fragSrc = Fragment.c_str();
+    const char* fragSrc = fragString.c_str();
 
     auto fragShader = glCreateShader(GL_FRAGMENT_SHADER);
     glShaderSource(fragShader, 1, &fragSrc, nullptr);
     glCompileShader(fragShader);
 
+    shaderError.clear();
     glGetShaderiv(fragShader, GL_COMPILE_STATUS, &success);
     if (!success)
     {
+        char errStr[256];
+        glGetShaderInfoLog(fragShader, 256, nullptr, errStr);
+        shaderError = errStr;
+
         std::cout << "Failed to compile Fragment Shader" << std::endl;
+        std::cout << shaderError << std::endl;
         return false;
     }
 
     
     //link to program
-    m_shader = glCreateProgram();
-    glAttachShader(m_shader, vertShader);
-    glAttachShader(m_shader, fragShader);
-    glLinkProgram(m_shader);
+    auto shader = glCreateProgram();
+    glAttachShader(shader, vertShader);
+    glAttachShader(shader, fragShader);
+    glLinkProgram(shader);
 
-    glGetProgramiv(m_shader, GL_LINK_STATUS, &success);
+    glGetProgramiv(shader, GL_LINK_STATUS, &success);
     if (!success)
     {
         std::cout << "Failed to link shader" << std::endl;
@@ -294,6 +317,13 @@ bool MasterSystem::loadShader()
         return false;
     }
 
+    //remove the old one if it exists
+    if (m_shader)
+    {
+        glDeleteProgram(m_shader);
+    }
+
+    m_shader = shader;
     glDeleteShader(fragShader);
     glDeleteShader(vertShader);
 
@@ -437,6 +467,35 @@ bool MasterSystem::handleEvent(const SDL_Event& evt)
 
     if(evt.type == SDL_KEYDOWN)
     {
+        if (evt.key.keysym.mod & KMOD_ALT)
+        {
+            switch (evt.key.keysym.sym)
+            {
+            default: break;
+            case SDLK_o:
+                m_showOptions = true;
+                break;
+            case SDLK_F4:
+                return true; //returning true from this func quits
+            }
+        }
+        else if (evt.key.keysym.mod & KMOD_CTRL)
+        {
+            switch (evt.key.keysym.sym)
+            {
+            default: break;
+            case SDLK_o:
+                browseRom();
+                break;
+            case SDLK_r:
+                if (!m_currentRom.empty())
+                {
+                    startRom(m_currentRom);
+                }
+                break;
+            }
+        }
+
         int key = -1;
         int player = 0;
         switch (evt.key.keysym.sym)
@@ -563,21 +622,12 @@ void MasterSystem::doImGui()
             //file menu
             if (ImGui::BeginMenu("File"))
             {
-                if (ImGui::MenuItem("Open", nullptr, nullptr))
+                if (ImGui::MenuItem("Open ROM", "CTRL+O", nullptr))
                 {
-                    static const char* filters[] = { "*.sms", "*.sg"};
-
-                    auto path = tinyfd_openFileDialog("Open ROM", nullptr, 1, filters, "Master System ROMs", 0);
-                    if (path)
-                    {
-                        //TODO assert file exists
-                        //TODO handle opening failures
-                        startRom(path);
-                        m_showUI = false;
-                    }
+                    browseRom();
                 }
 
-                if (ImGui::MenuItem("Reset", nullptr, nullptr))
+                if (ImGui::MenuItem("Reset Machine", "CTRL+R", nullptr))
                 {
                     if (!m_currentRom.empty())
                     {
@@ -585,7 +635,7 @@ void MasterSystem::doImGui()
                     }
                 }
 
-                if (ImGui::MenuItem("Quit", nullptr, nullptr))
+                if (ImGui::MenuItem("Quit", "ALT+F4", nullptr))
                 {
                     m_running = false;
                 }
@@ -595,12 +645,15 @@ void MasterSystem::doImGui()
             //view menu
             if (ImGui::BeginMenu("View"))
             {
-                if (ImGui::MenuItem("Options", nullptr, nullptr))
+                if (ImGui::MenuItem("Options", "ALT+O", &m_showOptions))
                 {
-                    
+                    if (!m_showOptions)
+                    {
+                        //TODO window was closed, so save options file
+                    }
                 }
                 
-                if (ImGui::MenuItem("Hide UI", nullptr, nullptr))
+                if (ImGui::MenuItem("Hide UI", "Esc, Ins", nullptr))
                 {
                     m_showUI = false;
                 }
@@ -611,6 +664,277 @@ void MasterSystem::doImGui()
             ImGui::EndMainMenuBar();
         }
     }
+
+    if (m_showOptions)
+    {
+        ImGui::SetNextWindowSize({ 340.f, 200.f });
+        ImGui::Begin("Options", &m_showOptions, ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoCollapse);
+        ImGui::BeginTabBar("##0");
+
+        if (ImGui::BeginTabItem("Video"))
+        {
+            ImGui::Text("TODO: Screen size");
+            ImGui::Text("TODO: Full screen toggle");
+            ImGui::Text("TODO: VSync toggle");
+            
+            ImGui::NewLine();
+            if (ImGui::Button("Load Shader"))
+            {
+                static const char* filters[] = { "*.glsl", "*.txt", ".fs" };
+                auto path = tinyfd_openFileDialog("Open File", nullptr, 3, filters, "Fragment Shader Source", 0);
+                if (path)
+                {
+                    std::ifstream file(path);
+                    if (file.is_open() && file.good())
+                    {
+                        std::string str((std::istreambuf_iterator<char>(file)), std::istreambuf_iterator<char>());
+                        m_textEditor.SetText(str);
+
+                        if (!loadShader(str))
+                        {
+                            tinyfd_messageBox("Error", shaderError.c_str(), "ok", "error", DialogResult::Yes);
+                        }
+                    }
+                    file.close();
+
+                    m_currentShaderPath = path;
+                }
+            }            
+            ImGui::SameLine();
+            if (ImGui::Button("Reset To Default"))
+            {
+                loadShader(Fragment);
+            }
+            ImGui::SameLine();
+            if (ImGui::Button("Shader Editor"))
+            {
+                m_showEditor = true;
+            }
+
+            ImGui::EndTabItem();
+        }
+
+        if (ImGui::BeginTabItem("Audio"))
+        {
+            ImGui::Text("TODO: channel selection");
+            ImGui::Text("TODO: Volume");
+
+            ImGui::EndTabItem();
+        }
+
+        if (ImGui::BeginTabItem("Input"))
+        {
+            ImGui::Text("TODO: Key binds");
+            ImGui::Text("TODO: Controller input");
+
+            ImGui::EndTabItem();
+        }
+
+        ImGui::EndTabBar();
+        
+        ImGui::End();
+
+        if (!m_showOptions)
+        {
+            //window was closed - save options
+        }
+    }
+
+    if (m_showEditor)
+    {
+        shaderEditor();
+    }
+}
+
+void MasterSystem::browseRom()
+{
+    static const char* filters[] = { "*.sms", "*.sg" };
+
+    auto path = tinyfd_openFileDialog("Open ROM", nullptr, 1, filters, "Master System ROMs", 0);
+    if (path)
+    {
+        //TODO assert file exists
+        //TODO handle opening failures
+        startRom(path);
+        m_showUI = false;
+    }
+}
+
+void MasterSystem::shaderEditor()
+{
+    const auto saveFile = [&]()
+    {
+        static const char* filters[] = { "*.glsl" };
+        auto path = tinyfd_saveFileDialog("Save As...", nullptr, 1, filters, "GLSL file");
+        if (path)
+        {
+            std::ofstream file(path);
+            if (file.is_open() && file.good())
+            {
+                auto str = m_textEditor.GetText();
+                file.write(str.c_str(), str.size());
+            }
+            file.close();
+
+            m_currentShaderPath = path;
+        }
+    };
+
+    const auto confirmationBox = [&saveFile]()->bool
+    {
+        auto ret = tinyfd_messageBox("Confirm", "Save Current File?", "yesnocancel", "question", DialogResult::Yes);
+        if (ret != DialogResult::Cancel)
+        {
+            if (ret == DialogResult::Yes)
+            {
+                //save the file
+                saveFile();
+            }
+            return true;
+        }
+        return false;
+    };
+
+    ImGui::SetNextWindowSize({ 600.f, 400.f });
+    ImGui::Begin("Shader Editor", &m_showEditor, 
+        ImGuiWindowFlags_NoCollapse | ImGuiWindowFlags_NoResize |
+    ImGuiWindowFlags_MenuBar | ImGuiWindowFlags_HorizontalScrollbar);
+
+    if (ImGui::BeginMenuBar())
+    {
+        if (ImGui::BeginMenu("File##000"))
+        {
+            if (ImGui::MenuItem("New..."))
+            {
+                if (confirmationBox())
+                {
+                    m_textEditor.SetText(Fragment);
+                    m_currentShaderPath.clear();
+                }
+            }
+
+            if (ImGui::MenuItem("Open##000"))
+            {
+                if (confirmationBox())
+                {
+                    static const char* filters[] = { "*.glsl", "*.txt", ".fs" };
+                    auto path = tinyfd_openFileDialog("Open File", nullptr, 3, filters, "Fragment Shader Source", 0);
+                    if (path)
+                    {
+                        std::ifstream file(path);
+                        if (file.is_open() && file.good())
+                        {
+                            std::string str((std::istreambuf_iterator<char>(file)), std::istreambuf_iterator<char>());
+                            m_textEditor.SetText(str);
+                        }
+                        file.close();
+
+                        m_currentShaderPath = path;
+                    }
+                }
+            }
+
+            if (ImGui::MenuItem("Save##000"))
+            {
+                if (m_currentShaderPath.empty())
+                {
+                    saveFile();
+                }
+                else
+                {
+                    std::ofstream file(m_currentShaderPath);
+                    if (file.is_open() && file.good())
+                    {
+                        auto str = m_textEditor.GetText();
+                        file.write(str.c_str(), str.size());
+                    }
+                    file.close();
+                }
+            }
+
+            if (ImGui::MenuItem("Save As...##000"))
+            {
+                saveFile();
+            }
+            ImGui::Separator();
+            if (ImGui::MenuItem("Exit##000"))
+            {
+                if (confirmationBox())
+                {
+                    m_showEditor = false;
+                }
+            }
+            ImGui::EndMenu();
+
+            if (ImGui::BeginMenu("Edit"))
+            {
+                if (ImGui::MenuItem("Undo", "ALT-Backspace", nullptr, m_textEditor.CanUndo()))
+                {
+                    m_textEditor.Undo();
+                }
+                if (ImGui::MenuItem("Redo", "Ctrl-Y", nullptr, m_textEditor.CanRedo()))
+                {
+                    m_textEditor.Redo();
+                }
+
+                ImGui::Separator();
+
+                if (ImGui::MenuItem("Copy", "Ctrl-C", nullptr, m_textEditor.HasSelection()))
+                {
+                    m_textEditor.Copy();
+                }
+                if (ImGui::MenuItem("Cut", "Ctrl-X", nullptr, m_textEditor.HasSelection()))
+                {
+                    m_textEditor.Cut();
+                }
+                if (ImGui::MenuItem("Delete", "Del", nullptr, m_textEditor.HasSelection()))
+                {
+                    m_textEditor.Delete();
+                }
+                if (ImGui::MenuItem("Paste", "Ctrl-V", nullptr, ImGui::GetClipboardText() != nullptr))
+                {
+                    m_textEditor.Paste();
+                }
+
+                ImGui::Separator();
+
+                if (ImGui::MenuItem("Select all", nullptr, nullptr))
+                {
+                    m_textEditor.SetSelection(TextEditor::Coordinates(), TextEditor::Coordinates(m_textEditor.GetTotalLines(), 0));
+                }
+                ImGui::EndMenu();
+            }
+        }
+
+        ImGui::EndMenuBar();
+    }
+
+
+    if (ImGui::Button("Build"))
+    {
+        loadShader(m_textEditor.GetText());
+    }
+    ImGui::SameLine();
+    if (shaderError.empty())
+    {
+        ImGui::Text("No Errors.");
+    }
+    else
+    {
+        ImGui::PushStyleColor(0, { 1.f, 0.f, 0.f, 1.f });
+        ImGui::Text("%s", shaderError.c_str());
+        ImGui::PopStyleColor();
+    }
+
+    auto cursorPos = m_textEditor.GetCursorPosition();
+    ImGui::Text("%6d/%-6d %6d lines  | %s | %s | %s", cursorPos.mLine + 1, cursorPos.mColumn + 1, m_textEditor.GetTotalLines(),
+        m_textEditor.IsOverwrite() ? "Ovr" : "Ins",
+        m_textEditor.CanUndo() ? "*" : " ",
+        m_textEditor.GetLanguageDefinition().mName.c_str());
+
+    m_textEditor.Render("TextEditor"); //we have to do this last as apparently there is no way to set its size
+
+    ImGui::End();
 }
 
 void MasterSystem::shutdown()

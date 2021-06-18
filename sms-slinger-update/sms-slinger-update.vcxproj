@@ -162,6 +162,7 @@
     <ClInclude Include="src\imgui\imstb_rectpack.h" />
     <ClInclude Include="src\imgui\imstb_textedit.h" />
     <ClInclude Include="src\imgui\imstb_truetype.h" />
+    <ClInclude Include="src\imgui\TextEditor.h" />
     <ClInclude Include="src\imgui\tinyfiledialogs.h" />
     <ClInclude Include="src\LogMessages.hpp" />
     <ClInclude Include="src\MasterSystem.hpp" />
@@ -184,6 +185,7 @@
     <ClCompile Include="src\imgui\imgui_stdlib.cpp" />
     <ClCompile Include="src\imgui\imgui_tables.cpp" />
     <ClCompile Include="src\imgui\imgui_widgets.cpp" />
+    <ClCompile Include="src\imgui\TextEditor.cpp" />
     <ClCompile Include="src\imgui\tinyfiledialogs.c" />
     <ClCompile Include="src\main.cpp" />
     <ClCompile Include="src\LogMessages.cpp" />

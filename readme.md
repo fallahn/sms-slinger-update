@@ -3,7 +3,7 @@ SMS-Slinger
 
 http://www.codeslinger.co.uk/pages/projects/mastersystem.html
 
-Copyright (c) 2008 <copyright holders> (sic)
+Copyright (c) 2008 copyright holders (sic)
 
 This software is provided 'as-is', without any express or implied
 warranty. In no event will the authors be held liable for any damages
@@ -23,9 +23,10 @@ freely, subject to the following restrictions:
 
 
 
-This repository contains the original source updated (WIP) to SDL 2.0 from
+This repository contains the original source updated to SDL 2.0 from
 SDL 1.2, as well as some cross platform enhancements (remove MFC/ATL
-dependency on Windows, use dearImGui on all platforms)
+dependency on Windows, use dearImGui on all platforms, built in shader
+editor for post-process effects). Also minor bug fixes/improvements.
 
 
 Ported to SDL2 2021 Matt Marchant

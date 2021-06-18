@@ -19,4 +19,5 @@ set(PROJECT_SRC
   ${PROJECT_DIR}/imgui/imgui_stdlib.cpp
   ${PROJECT_DIR}/imgui/imgui_tables.cpp
   ${PROJECT_DIR}/imgui/imgui_widgets.cpp
+  ${PROJECT_DIR}/imgui/TextEditor.cpp
   ${PROJECT_DIR}/imgui/tinyfiledialogs.c)
