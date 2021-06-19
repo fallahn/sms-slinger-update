@@ -56,19 +56,21 @@ SN79489::SN79489()
     m_bufferUpdateCount (0.f),
     m_updateBufferLimit (0.f)
 {
-    constexpr int maxVolume = 4000; // there are 4 channels and the output is a signed 16 bit num giving a range of -32,000 + 32,000 so 4 * 8000 fits into the range
-    constexpr double TwodBScalingFactor = 0.79432823; // each volume setting gets lower by 2 decibels
+    //constexpr int maxVolume = 4000; // there are 4 channels and the output is a signed 16 bit num giving a range of -32,000 + 32,000 so 4 * 8000 fits into the range
+    constexpr float maxVolume = 1.f / Channel::Count; //so that when all tones are playing we're never more than 1
+    constexpr float TwodBScalingFactor = 0.79432823f; //each volume setting gets lower by 2 decibels
 
-    double vol = maxVolume;
+    float vol = maxVolume;
 
     for (int i = 0; i < 15; ++i)
     {
-        m_volumeTable[i] = static_cast<int>(vol);
+        m_volumeTable[i] = vol;
         vol *= TwodBScalingFactor;
     }
 
     // volume 15 is silent
-    m_volumeTable[15] = 0;
+    m_volumeTable[15] = 0.f;
+    std::fill(m_mixerVolumes.begin(), m_mixerVolumes.end(), 0.5f);
 
     reset();
 
@@ -181,16 +183,13 @@ void SN79489::writeData(unsigned long int cycles, BYTE data)
 void SN79489::reset()
 {
     m_bufferUpdateCount = 0;
-    std::fill(m_buffer.begin(), m_buffer.end(), 0);
+    std::fill(m_buffer.begin(), m_buffer.end(), 0.f);
     std::fill(m_tones.begin(), m_tones.end(), 0);
     std::fill(m_counters.begin(), m_counters.end(), 0);
+    std::fill(m_volume.begin(), m_volume.end(), 0x0F);
+    std::fill(m_polarity.begin(), m_polarity.end(), 1);
+
     m_clockInfo = 0;
-    
-    for (int i = 0; i < 4; i++)
-    {
-        m_volume[i] = 0xF;
-        m_polarity[i] = 1;
-    }
     m_latchedChannel = Channel::Zero;
     m_isToneLatched = true;
     m_currentBufferPos = 0;
@@ -212,8 +211,8 @@ void SN79489::update(float cyclesMac)
 
     m_bufferUpdateCount += floor;
     
-    // tone channels
-    signed short int tone = 0;
+    //tone channels
+    float tone = 0.f;
     
     for (int i = 0; i < Channel::Three; i++)
     {
@@ -230,10 +229,10 @@ void SN79489::update(float cyclesMac)
             m_polarity[i] *= -1;
         }
 
-        tone += m_volumeTable[m_volume[i]] * m_polarity[i];
+        tone += m_volumeTable[m_volume[i]] * m_polarity[i] * m_mixerVolumes[i];
     }
 
-    // emulate noise
+    //emulate noise
     if (m_tones[Tones::Noise] != 0)
     {
         m_counters[Tones::Noise] -= static_cast<int>(floor);
@@ -256,7 +255,7 @@ void SN79489::update(float cyclesMac)
             m_counters[Tones::Noise] = count;
             m_polarity[Tones::Noise] *= -1;
 
-            // if the polarity changed from -1 to 1 then shift the random number
+            //if the polarity changed from -1 to 1 then shift the random number
             if (m_polarity[Tones::Noise] == 1)
             {
                 bool isWhiteNoise = testBit(m_tones[Tones::Noise], 2);
@@ -267,14 +266,14 @@ void SN79489::update(float cyclesMac)
             }
         }
 
-        tone += m_volumeTable[m_volume[Tones::Noise]] * (m_LFSR & 1);
+        tone += m_volumeTable[m_volume[Tones::Noise]] * (m_LFSR & 1) * m_mixerVolumes[MixerChannel::Noise];
     }
 
     if (m_bufferUpdateCount >= m_updateBufferLimit)
     {
         if (m_currentBufferPos < BUFFERSIZE)
         {
-            m_buffer[m_currentBufferPos] = tone;
+            m_buffer[m_currentBufferPos] = tone * m_mixerVolumes[MixerChannel::Master];
         }
             
         m_currentBufferPos = (m_currentBufferPos + 1) % BUFFERSIZE;
@@ -292,13 +291,18 @@ SN79489::SampleBuffer SN79489::getSamples() const
 {
     SampleBuffer buf;
     buf.data = m_buffer.data();
-    buf.size = m_currentBufferPos * sizeof(std::int16_t);
+    buf.size = m_currentBufferPos * sizeof(float);
 
     //this assumes all the data has been consumed by the caller
     //so we start writing from the beginning again
     m_currentBufferPos = 0;
 
     return buf;
+}
+
+void SN79489::setVolume(SN79489::MixerChannel::Label channel, float vol)
+{
+    m_mixerVolumes[channel] = std::max(0.f, std::min(1.f, vol));
 }
 
 void SN79489::dumpClockInfo()

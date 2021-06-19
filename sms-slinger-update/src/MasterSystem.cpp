@@ -398,7 +398,7 @@ void MasterSystem::initAudio()
 {
     SDL_AudioSpec as;
     as.freq = SN79489::FREQUENCY;
-    as.format = AUDIO_S16SYS;
+    as.format = AUDIO_F32;
     as.channels = 1;
     as.silence = 0;
     as.samples = SN79489::BUFFERSIZE;
@@ -755,28 +755,35 @@ void MasterSystem::doImGui()
 
         if (ImGui::BeginTabItem("Audio"))
         {
-            static bool tone1 = true;
-            if (ImGui::Checkbox("Tone 1", &tone1))
+            ImGui::Text("Channels:");
+            bool tone = m_emulator->getSoundChip().getVolume(SN79489::MixerChannel::One) > 0;
+            if (ImGui::Checkbox("Tone 1", &tone))
             {
-                std::cout << "implement me!" << std::endl;
+                m_emulator->getSoundChip().setVolume(SN79489::MixerChannel::One, tone ? 1.f : 0.f);
             }
 
-            static bool tone2 = true;
-            if (ImGui::Checkbox("Tone 2", &tone2))
+            tone = m_emulator->getSoundChip().getVolume(SN79489::MixerChannel::Two) > 0;
+            if (ImGui::Checkbox("Tone 2", &tone))
             {
-                std::cout << "implement me!" << std::endl;
+                m_emulator->getSoundChip().setVolume(SN79489::MixerChannel::Two, tone ? 1.f : 0.f);
             }
 
-            static bool tone3 = true;
-            if (ImGui::Checkbox("Tone 3", &tone3))
+            tone = m_emulator->getSoundChip().getVolume(SN79489::MixerChannel::Three) > 0;
+            if (ImGui::Checkbox("Tone 3", &tone))
             {
-                std::cout << "implement me!" << std::endl;
+                m_emulator->getSoundChip().setVolume(SN79489::MixerChannel::Three, tone ? 1.f : 0.f);
             }
-            
-            static float vol = 1.f;
-            if (ImGui::SliderFloat("Volume", &vol, 0.f, 1.f))
+
+            bool noise = m_emulator->getSoundChip().getVolume(SN79489::MixerChannel::Noise) > 0;
+            if (ImGui::Checkbox("Noise", &noise))
             {
-                std::cout << "implement me!" << std::endl;
+                m_emulator->getSoundChip().setVolume(SN79489::MixerChannel::Noise, noise ? 1.f : 0.f);
+            }
+
+            float vol = m_emulator->getSoundChip().getVolume(SN79489::MixerChannel::Master);
+            if (ImGui::SliderFloat("Master Volume", &vol, 0.f, 1.f))
+            {
+                m_emulator->getSoundChip().setVolume(SN79489::MixerChannel::Master, vol);
             }
 
             ImGui::EndTabItem();
@@ -1025,8 +1032,26 @@ void MasterSystem::loadSettings()
             {
                 m_currentShaderPath = prop.getValue<std::string>();
             }
-
-            //TODO audio settings
+            else if (name == "master_volume")
+            {
+                m_emulator->getSoundChip().setVolume(SN79489::MixerChannel::Master, prop.getValue<float>());
+            }
+            else if (name == "tone01_volume")
+            {
+                m_emulator->getSoundChip().setVolume(SN79489::MixerChannel::One, prop.getValue<bool>() ? 1 : 0.f);
+            }
+            else if (name == "tone02_volume")
+            {
+                m_emulator->getSoundChip().setVolume(SN79489::MixerChannel::Two, prop.getValue<bool>() ? 1 : 0.f);
+            }
+            else if (name == "tone03_volume")
+            {
+                m_emulator->getSoundChip().setVolume(SN79489::MixerChannel::Three, prop.getValue<bool>() ? 1 : 0.f);
+            }
+            else if (name == "noise_volume")
+            {
+                m_emulator->getSoundChip().setVolume(SN79489::MixerChannel::Noise, prop.getValue<bool>() ? 1 : 0.f);
+            }
             //TODO keybinds
         }
     }
@@ -1045,8 +1070,12 @@ void MasterSystem::saveSettings()
     {
         cfg.addProperty("active_shader").setValue(m_currentShaderPath);
     }
-
-    //TODO audio settings
+    cfg.addProperty("master_volume").setValue(m_emulator->getSoundChip().getVolume(SN79489::MixerChannel::Master));
+    cfg.addProperty("tone01_volume").setValue(m_emulator->getSoundChip().getVolume(SN79489::MixerChannel::One) > 0 ? true : false);
+    cfg.addProperty("tone02_volume").setValue(m_emulator->getSoundChip().getVolume(SN79489::MixerChannel::Two) > 0 ? true : false);
+    cfg.addProperty("tone03_volume").setValue(m_emulator->getSoundChip().getVolume(SN79489::MixerChannel::Three) > 0 ? true : false);
+    cfg.addProperty("noise_volume").setValue(m_emulator->getSoundChip().getVolume(SN79489::MixerChannel::Noise) > 0 ? true : false);
+    
     //TODO keybinds
 
     cfg.save("settings.cfg");

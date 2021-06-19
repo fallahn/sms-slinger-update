@@ -50,6 +50,21 @@ public:
     };
     SampleBuffer getSamples() const;
 
+    struct MixerChannel final
+    {
+        enum Label
+        {
+            One, Two, Three,
+            Noise,
+            Master,
+
+            Count
+        };
+    };
+    void setVolume(MixerChannel::Label, float);
+
+    float getVolume(MixerChannel::Label channel) const { return m_mixerVolumes[channel]; }
+
 private:
 
     struct Channel final
@@ -91,13 +106,15 @@ private:
         };
     };
 
-    std::vector<std::int16_t> m_buffer;
+    std::vector<float> m_buffer;
 
     std::array<WORD, Tones::Count> m_tones = {};
     std::array<BYTE, Volume::Count> m_volume = {};
     std::array<int, Channel::Count> m_counters = {};
     std::array<int, Channel::Count> m_polarity = {};
-    std::array<int, 16> m_volumeTable = {};
+    std::array<float, 16> m_volumeTable = {};
+
+    std::array<float, MixerChannel::Count> m_mixerVolumes;
 
     int m_latchedChannel;
     bool m_isToneLatched;
