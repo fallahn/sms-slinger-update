@@ -34,14 +34,13 @@
 
 namespace
 {
-    int parity(BYTE data)
+    int parity(WORD val)
     {
-        int count = bitCount(data, 4);
-        if ((count % 2) == 0)
-        {
-            return 0;
-        }
-        return 1;
+        val ^= val >> 8;
+        val ^= val >> 4;
+        val ^= val >> 2;
+        val ^= val >> 1;
+        return val;
     }
 }
 
@@ -253,14 +252,25 @@ void SN79489::update(float cyclesMac)
             }
 
             m_counters[Tones::Noise] = count;
+
+            auto oldPolarity = m_polarity[Tones::Noise];
             m_polarity[Tones::Noise] *= -1;
 
             //if the polarity changed from -1 to 1 then shift the random number
-            if (m_polarity[Tones::Noise] == 1)
+            if (m_polarity[Tones::Noise] == 1
+                /*&& oldPolarity != 1*/)
             {
                 bool isWhiteNoise = testBit(m_tones[Tones::Noise], 2);
-                BYTE tappedBits = static_cast<BYTE>(bitGetVal(m_tones[Tones::Noise], 0));
-                tappedBits |= (bitGetVal(m_tones[Tones::Noise], 3) << 3);
+
+                //not sure where the tapped bits value is coming from here:
+                //according to https://www.smspower.org/uploads/Development/SN76489-20030421.txt
+                //the master system is fixed at 0x0009, which in this instance
+                //gives an audibly more pleasing sound - M
+
+                /*WORD tappedBits = bitGetVal(m_tones[Tones::Noise], 0);
+                tappedBits |= (bitGetVal(m_tones[Tones::Noise], 3) << 3);*/
+
+                constexpr WORD tappedBits = 0x0009;
                 
                 m_LFSR = (m_LFSR >> 1) | ((isWhiteNoise ? parity(m_LFSR & tappedBits) : (m_LFSR & 1)) << 15);
             }
