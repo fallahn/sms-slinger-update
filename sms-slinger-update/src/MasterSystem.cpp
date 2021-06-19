@@ -98,7 +98,7 @@ MasterSystem::MasterSystem()
     : m_emulator    (nullptr),
     m_width         (0),
     m_height        (0),
-    m_windowScale   (1),
+    m_windowScale   (2),
     m_useGFXOpt     (false),
     m_shader        (0),
     m_texture       (0),
@@ -658,6 +658,8 @@ void MasterSystem::doImGui()
                         //TODO window was closed, so save options file
                     }
                 }
+
+                ImGui::MenuItem("Shader Editor", nullptr, &m_showEditor);
                 
                 if (ImGui::MenuItem("Hide UI", "Esc, Ins", nullptr))
                 {
@@ -745,6 +747,7 @@ void MasterSystem::doImGui()
             if (ImGui::Button("Shader Editor"))
             {
                 m_showEditor = true;
+                m_showOptions = false;
             }
 
             ImGui::EndTabItem();
@@ -853,7 +856,7 @@ void MasterSystem::shaderEditor()
         return false;
     };
 
-    ImGui::SetNextWindowSize({ 600.f, 400.f });
+    ImGui::SetNextWindowSize({ 600.f, 700.f });
     ImGui::Begin("Shader Editor", &m_showEditor, 
         ImGuiWindowFlags_NoCollapse | ImGuiWindowFlags_NoResize |
     ImGuiWindowFlags_MenuBar | ImGuiWindowFlags_HorizontalScrollbar);
@@ -903,8 +906,8 @@ void MasterSystem::shaderEditor()
                     std::ofstream file(m_currentShaderPath);
                     if (file.is_open() && file.good())
                     {
-                    auto str = m_textEditor.GetText();
-                    file.write(str.c_str(), str.size());
+                        auto str = m_textEditor.GetText();
+                        file.write(str.c_str(), str.size());
                     }
                     file.close();
                 }
@@ -923,45 +926,45 @@ void MasterSystem::shaderEditor()
                 }
             }
             ImGui::EndMenu();
+        }
 
-            if (ImGui::BeginMenu("Edit"))
+        if (ImGui::BeginMenu("Edit"))
+        {
+            if (ImGui::MenuItem("Undo", "ALT-Backspace", nullptr, m_textEditor.CanUndo()))
             {
-                if (ImGui::MenuItem("Undo", "ALT-Backspace", nullptr, m_textEditor.CanUndo()))
-                {
-                    m_textEditor.Undo();
-                }
-                if (ImGui::MenuItem("Redo", "Ctrl-Y", nullptr, m_textEditor.CanRedo()))
-                {
-                    m_textEditor.Redo();
-                }
-
-                ImGui::Separator();
-
-                if (ImGui::MenuItem("Copy", "Ctrl-C", nullptr, m_textEditor.HasSelection()))
-                {
-                    m_textEditor.Copy();
-                }
-                if (ImGui::MenuItem("Cut", "Ctrl-X", nullptr, m_textEditor.HasSelection()))
-                {
-                    m_textEditor.Cut();
-                }
-                if (ImGui::MenuItem("Delete", "Del", nullptr, m_textEditor.HasSelection()))
-                {
-                    m_textEditor.Delete();
-                }
-                if (ImGui::MenuItem("Paste", "Ctrl-V", nullptr, ImGui::GetClipboardText() != nullptr))
-                {
-                    m_textEditor.Paste();
-                }
-
-                ImGui::Separator();
-
-                if (ImGui::MenuItem("Select all", nullptr, nullptr))
-                {
-                    m_textEditor.SetSelection(TextEditor::Coordinates(), TextEditor::Coordinates(m_textEditor.GetTotalLines(), 0));
-                }
-                ImGui::EndMenu();
+                m_textEditor.Undo();
             }
+            if (ImGui::MenuItem("Redo", "Ctrl-Y", nullptr, m_textEditor.CanRedo()))
+            {
+                m_textEditor.Redo();
+            }
+
+            ImGui::Separator();
+
+            if (ImGui::MenuItem("Copy", "Ctrl-C", nullptr, m_textEditor.HasSelection()))
+            {
+                m_textEditor.Copy();
+            }
+            if (ImGui::MenuItem("Cut", "Ctrl-X", nullptr, m_textEditor.HasSelection()))
+            {
+                m_textEditor.Cut();
+            }
+            if (ImGui::MenuItem("Delete", "Del", nullptr, m_textEditor.HasSelection()))
+            {
+                m_textEditor.Delete();
+            }
+            if (ImGui::MenuItem("Paste", "Ctrl-V", nullptr, ImGui::GetClipboardText() != nullptr))
+            {
+                m_textEditor.Paste();
+            }
+
+            ImGui::Separator();
+
+            if (ImGui::MenuItem("Select all", nullptr, nullptr))
+            {
+                m_textEditor.SetSelection(TextEditor::Coordinates(), TextEditor::Coordinates(m_textEditor.GetTotalLines(), 0));
+            }
+            ImGui::EndMenu();
         }
 
         ImGui::EndMenuBar();
@@ -993,6 +996,11 @@ void MasterSystem::shaderEditor()
     m_textEditor.Render("TextEditor"); //we have to do this last as apparently there is no way to set its size
 
     ImGui::End();
+
+    if (!m_showEditor)
+    {
+        confirmationBox();
+    }
 }
 
 void MasterSystem::loadSettings()
@@ -1021,6 +1029,10 @@ void MasterSystem::loadSettings()
             //TODO audio settings
             //TODO keybinds
         }
+    }
+    else
+    {
+        saveSettings();
     }
 }
 
