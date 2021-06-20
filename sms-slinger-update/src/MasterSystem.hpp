@@ -73,6 +73,7 @@ private:
     bool loadTexture();
     bool loadQuad();
     void initAudio();
+    void applyViewport();
 
     void romLoopFixedStep(int fps);
     void romLoopFree();

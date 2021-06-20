@@ -245,7 +245,7 @@ bool MasterSystem::initGL()
     }
 
 
-    glViewport(0, 0, m_width * m_windowScale, m_height * m_windowScale);
+    applyViewport();
 
     glClearColor(0.f, 0.f, 1.f, 1.f);
 
@@ -409,6 +409,34 @@ void MasterSystem::initAudio()
     SDL_PauseAudioDevice(audioDevice, 1);
 }
 
+void MasterSystem::applyViewport()
+{
+    int l = 0;
+
+    auto w = m_width * m_windowScale;
+    auto h = m_height * m_windowScale;
+
+    if (fullScreen)
+    {
+        SDL_DisplayMode dm;
+        SDL_GetDesktopDisplayMode(0, &dm);
+        
+        auto scale = static_cast<float>(dm.h) / h;
+        w *= scale;
+        h *= scale;
+
+        l = (dm.w - w) / 2;
+    }
+    else
+    {
+        //recentre window
+        SDL_SetWindowPosition(window, SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED);
+    }
+
+    glViewport(l, 0, w, h);
+
+}
+
 void MasterSystem::romLoopFixedStep(int fps)
 {
     assert(fps > 0);
@@ -466,6 +494,11 @@ void MasterSystem::romLoopFree()
 bool MasterSystem::handleEvent(const SDL_Event& evt)
 {
     ImGui_ImplSDL2_ProcessEvent(&evt);
+
+    if (ImGui::GetIO().WantCaptureKeyboard)
+    {
+        return false;
+    }
 
     if(evt.type == SDL_KEYDOWN)
     {
@@ -568,9 +601,7 @@ bool MasterSystem::handleEvent(const SDL_Event& evt)
     {
         if (evt.window.event == SDL_WINDOWEVENT_RESIZED)
         {
-            auto w = evt.window.data1;
-            auto h = evt.window.data2;
-            glViewport(0, 0, w, h);
+            //applyViewport();
         }
     }
 
@@ -597,7 +628,7 @@ void MasterSystem::render()
             auto w = m_width * m_windowScale;
             auto h = m_height * m_windowScale;
             SDL_SetWindowSize(window, w, h);
-            glViewport(0, 0, w, h);
+            applyViewport();
 
             //resize texture
             glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, m_width, m_height, 0, GL_RGB, GL_UNSIGNED_BYTE, nullptr);
@@ -691,7 +722,7 @@ void MasterSystem::doImGui()
                 auto w = m_width * m_windowScale;
                 auto h = m_height * m_windowScale;
                 SDL_SetWindowSize(window, w, h);
-                glViewport(0, 0, w, h);
+                applyViewport();
             }
 
             if (ImGui::Checkbox("Full Screen", &fullScreen))
@@ -699,13 +730,12 @@ void MasterSystem::doImGui()
                 if (fullScreen)
                 {
                     SDL_SetWindowFullscreen(window, SDL_WINDOW_FULLSCREEN_DESKTOP);
-                    //TODO letterbox this properly
                 }
                 else
                 {
                     SDL_SetWindowFullscreen(window, 0);
-                    glViewport(0, 0, m_width * m_windowScale, m_height * m_windowScale);
                 }
+                applyViewport();
             }
 
             bool vsync = SDL_GL_GetSwapInterval() == 1;
