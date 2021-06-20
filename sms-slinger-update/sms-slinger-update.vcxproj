@@ -152,6 +152,7 @@
     <ClInclude Include="src\ConfigFile.hpp" />
     <ClInclude Include="src\Emulator.hpp" />
     <ClInclude Include="src\glad.hpp" />
+    <ClInclude Include="src\HiResTimer.hpp" />
     <ClInclude Include="src\imgui\imconfig.h" />
     <ClInclude Include="src\imgui\imgui.h" />
     <ClInclude Include="src\imgui\imgui_impl_opengl3.h" />
@@ -166,6 +167,8 @@
     <ClInclude Include="src\imgui\tinyfiledialogs.h" />
     <ClInclude Include="src\LogMessages.hpp" />
     <ClInclude Include="src\MasterSystem.hpp" />
+    <ClInclude Include="src\RingBuffer.hpp" />
+    <ClInclude Include="src\Sampler.hpp" />
     <ClInclude Include="src\SN79489.hpp" />
     <ClInclude Include="src\TMS9918A.hpp" />
     <ClInclude Include="src\useful_utils.hpp" />
@@ -190,6 +193,7 @@
     <ClCompile Include="src\main.cpp" />
     <ClCompile Include="src\LogMessages.cpp" />
     <ClCompile Include="src\MasterSystem.cpp" />
+    <ClCompile Include="src\Sampler.cpp" />
     <ClCompile Include="src\SN79489.cpp" />
     <ClCompile Include="src\TMS9918A.cpp" />
     <ClCompile Include="src\Z80.cpp" />

@@ -244,6 +244,8 @@ void Emulator::update()
         soundCycles /= CPU_CYCLES_TO_MACHINE_CLICKS;
         m_soundChip.update(soundCycles);       
     }
+
+    //TODO move vdp/sound updates here and only update for number of cycles as necessary
 }
 
 BYTE Emulator::readMemory(const WORD& address)

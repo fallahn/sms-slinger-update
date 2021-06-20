@@ -25,6 +25,9 @@
 
 #pragma once
 
+#include "Sampler.hpp"
+#include "HiResTimer.hpp"
+
 #include <vector>
 #include <array>
 #include <cstdint>
@@ -124,4 +127,7 @@ private:
     unsigned long int m_clockInfo;
     float m_bufferUpdateCount;
     float m_updateBufferLimit;
+
+    Sampler m_sampler;
+    HiResTimer m_timer;
 };

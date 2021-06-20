@@ -53,18 +53,19 @@ SN79489::SN79489()
     m_LFSR              (0),
     m_clockInfo         (0),
     m_bufferUpdateCount (0.f),
-    m_updateBufferLimit (0.f)
+    m_updateBufferLimit (0.f),
+    m_sampler           (224000.0, 48000.0, 800)
 {
     //constexpr int maxVolume = 4000; // there are 4 channels and the output is a signed 16 bit num giving a range of -32,000 + 32,000 so 4 * 8000 fits into the range
-    constexpr float maxVolume = 1.f / Channel::Count; //so that when all tones are playing we're never more than 1
+    constexpr float MaxVolume = 1.f / Channel::Count; //so that when all tones are playing we're never more than 1
     constexpr float TwodBScalingFactor = 0.79432823f; //each volume setting gets lower by 2 decibels
 
-    float vol = maxVolume;
+    float vol = MaxVolume;
 
     for (int i = 0; i < 15; ++i)
     {
-        m_volumeTable[i] = vol;
         vol *= TwodBScalingFactor;
+        m_volumeTable[i] = vol;
     }
 
     // volume 15 is silent
@@ -206,84 +207,102 @@ void SN79489::update(float cyclesMac)
     float floor = std::floor(m_cycles);
     m_clockInfo += static_cast<unsigned long>(floor);
 
+    static float accum = 0.f;
+    accum += m_timer.restart();
+    while (accum > 1.f)
+    {
+        accum -= 1.f;
+        std::cout << m_clockInfo << std::endl;
+        m_clockInfo = 0;
+    }
+
+
     m_cycles -= floor; 
 
     m_bufferUpdateCount += floor;
     
-    //tone channels
-    float tone = 0.f;
-    
-    for (int i = 0; i < Channel::Three; i++)
-    {
-        if (m_tones[i] == 0)
+
+    //for (auto l = 0; l < floor; ++l)
+    //{
+        //tone channels
+        float tone = 0.f;
+
+        for (int i = 0; i < Channel::Three; i++)
         {
-            continue;
-        }
-
-        m_counters[i] -= static_cast<int>(floor);
-
-        if (m_counters[i] <= 0)
-        {
-            m_counters[i] = m_tones[i]; 
-            m_polarity[i] *= -1;
-        }
-
-        tone += m_volumeTable[m_volume[i]] * m_polarity[i] * m_mixerVolumes[i];
-    }
-
-    //emulate noise
-    if (m_tones[Tones::Noise] != 0)
-    {
-        m_counters[Tones::Noise] -= static_cast<int>(floor);
-        
-        if (m_counters[Tones::Noise] <= 0)
-        {
-            WORD freq = m_tones[Tones::Noise];
-            freq &= 0x3;
-
-            int count = 0;
-            switch (freq)
+            if (m_tones[i] == 0)
             {
+                continue;
+            }
+
+            m_counters[i] -= static_cast<int>(floor);
+
+            if (m_counters[i] <= 0)
+            {
+                m_counters[i] = m_tones[i];
+                m_polarity[i] *= -1;
+            }
+
+            tone += m_volumeTable[m_volume[i]] * m_polarity[i] * m_mixerVolumes[i];
+        }
+
+        //emulate noise
+        if (m_tones[Tones::Noise] != 0)
+        {
+            m_counters[Tones::Noise] -= static_cast<int>(floor);
+
+            if (m_counters[Tones::Noise] <= 0)
+            {
+                WORD freq = m_tones[Tones::Noise];
+                freq &= 0x3;
+
+                int count = 0;
+                switch (freq)
+                {
                 case 0: count = 0x10; break;
                 case 1: count = 0x20; break;
                 case 2: count = 0x40; break;
                 case 3: count = m_tones[Channel::Two]; break;
                 default: break;
+                }
+
+                m_counters[Tones::Noise] = count;
+
+                auto oldPolarity = m_polarity[Tones::Noise];
+                m_polarity[Tones::Noise] *= -1;
+
+                //if the polarity changed from -1 to 1 then shift the random number
+                if (m_polarity[Tones::Noise] == 1
+                    /*&& oldPolarity != 1*/)
+                {
+                    bool isWhiteNoise = testBit(m_tones[Tones::Noise], 2);
+
+                    //not sure where the tapped bits value is coming from here:
+                    //according to https://www.smspower.org/uploads/Development/SN76489-20030421.txt
+                    //the master system is fixed at 0x0009, which in this instance
+                    //gives an audibly more pleasing sound - M
+
+                    /*WORD tappedBits = bitGetVal(m_tones[Tones::Noise], 0);
+                    tappedBits |= (bitGetVal(m_tones[Tones::Noise], 3) << 3);*/
+
+                    constexpr WORD tappedBits = 0x0009;
+
+                    m_LFSR = (m_LFSR >> 1) | ((isWhiteNoise ? parity(m_LFSR & tappedBits) : (m_LFSR & 1)) << 15);
+                }
             }
 
-            m_counters[Tones::Noise] = count;
-
-            auto oldPolarity = m_polarity[Tones::Noise];
-            m_polarity[Tones::Noise] *= -1;
-
-            //if the polarity changed from -1 to 1 then shift the random number
-            if (m_polarity[Tones::Noise] == 1
-                /*&& oldPolarity != 1*/)
-            {
-                bool isWhiteNoise = testBit(m_tones[Tones::Noise], 2);
-
-                //not sure where the tapped bits value is coming from here:
-                //according to https://www.smspower.org/uploads/Development/SN76489-20030421.txt
-                //the master system is fixed at 0x0009, which in this instance
-                //gives an audibly more pleasing sound - M
-
-                /*WORD tappedBits = bitGetVal(m_tones[Tones::Noise], 0);
-                tappedBits |= (bitGetVal(m_tones[Tones::Noise], 3) << 3);*/
-
-                constexpr WORD tappedBits = 0x0009;
-                
-                m_LFSR = (m_LFSR >> 1) | ((isWhiteNoise ? parity(m_LFSR & tappedBits) : (m_LFSR & 1)) << 15);
-            }
+            tone += m_volumeTable[m_volume[Tones::Noise]] * (m_LFSR & 1) * m_mixerVolumes[MixerChannel::Noise];
         }
 
-        tone += m_volumeTable[m_volume[Tones::Noise]] * (m_LFSR & 1) * m_mixerVolumes[MixerChannel::Noise];
-    }
+        //m_sampler.push(tone);
+    //}
 
     if (m_bufferUpdateCount >= m_updateBufferLimit)
+    //if (m_sampler.pending())
     {
-        if (m_currentBufferPos < BUFFERSIZE)
+        //if (m_currentBufferPos < BUFFERSIZE)
         {
             m_buffer[m_currentBufferPos] = tone * m_mixerVolumes[MixerChannel::Master];
+            //m_buffer[m_currentBufferPos] = static_cast<float>(m_sampler.pop()) * m_mixerVolumes[MixerChannel::Master];
         }
             
         m_currentBufferPos = (m_currentBufferPos + 1) % BUFFERSIZE;

@@ -26,36 +26,14 @@
 #pragma once
 
 #include "imgui/TextEditor.h"
+#include "HiResTimer.hpp"
 
 #include <SDL_events.h>
-#include <SDL_timer.h>
 
 #include <memory>
 #include <string>
 
 class Emulator;
-class HiResTimer final
-{
-public:
-    HiResTimer()
-    {
-        m_start = m_current = SDL_GetPerformanceCounter();
-        m_frequency = SDL_GetPerformanceFrequency();
-    }
-
-    float restart()
-    {
-        m_start = m_current;
-        m_current = SDL_GetPerformanceCounter();
-        return static_cast<float>(m_current - m_start) / static_cast<float>(m_frequency);
-    }
-
-private:
-    Uint64 m_start = 0;
-    Uint64 m_current = 0;
-    Uint64 m_frequency = 0;
-};
-
 class MasterSystem final
 {
 public:
