@@ -29,6 +29,7 @@
 #include "HiResTimer.hpp"
 
 #include <SDL_events.h>
+#include <SDL_gamecontroller.h>
 
 #include <memory>
 #include <string>
@@ -68,6 +69,20 @@ private:
 
     HiResTimer m_updateTimer;
 
+    struct ControllerInfo final
+    {
+        ControllerInfo() = default;
+        explicit ControllerInfo(SDL_GameController* gc)
+            : gameController(gc) {}
+
+        SDL_GameController* gameController = nullptr;
+        std::int32_t joystickID = -1; //controller IDs don't map 1-1 with SDL IDs
+    };
+    static constexpr std::int32_t MaxControllers = 2;
+    std::array<ControllerInfo, MaxControllers> m_gameControllers = {};
+
+
+
     bool initGL();
     bool loadShader(const std::string&);
     bool loadTexture();
@@ -87,6 +102,10 @@ private:
 
     void loadSettings();
     void saveSettings();
+
+    void addController(const SDL_Event&);
+    void removeController(const SDL_Event&);
+
 
     void shutdown();
 };

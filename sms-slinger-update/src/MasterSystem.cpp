@@ -247,7 +247,7 @@ bool MasterSystem::initGL()
 
     applyViewport();
 
-    glClearColor(0.f, 0.f, 1.f, 1.f);
+    glClearColor(0.f, 0.f, 0.f, 1.f);
 
     glEnable(GL_TEXTURE_2D);
     glEnable(GL_CULL_FACE);
@@ -495,13 +495,13 @@ bool MasterSystem::handleEvent(const SDL_Event& evt)
 {
     ImGui_ImplSDL2_ProcessEvent(&evt);
 
-    if (ImGui::GetIO().WantCaptureKeyboard)
-    {
-        return false;
-    }
-
     if(evt.type == SDL_KEYDOWN)
     {
+        if (ImGui::GetIO().WantCaptureKeyboard)
+        {
+            return false;
+        }
+
         if (evt.key.keysym.mod & KMOD_ALT)
         {
             switch (evt.key.keysym.sym)
@@ -567,9 +567,13 @@ bool MasterSystem::handleEvent(const SDL_Event& evt)
             m_emulator->setKeyPressed(player, key);
         }
     }
-    //If a key was released
     else if(evt.type == SDL_KEYUP)
     {
+        if (ImGui::GetIO().WantCaptureKeyboard)
+        {
+            return false;
+        }
+
         int key = -1;
         int player = 0;
         switch(evt.key.keysym.sym)
@@ -580,7 +584,7 @@ bool MasterSystem::handleEvent(const SDL_Event& evt)
         case SDLK_LEFT: key = 2; break;
         case SDLK_UP: key = 0; break;
         case SDLK_DOWN: key = 1; break;
-        case SDLK_BACKSPACE : key = 4; player = 1;break;
+        case SDLK_BACKSPACE : key = 4; player = 1; break;
         case SDLK_KP_4: player = 1; key = 0; break; // left
         case SDLK_KP_6: player = 1; key = 1; break; // right
         case SDLK_KP_7: player = 1; key = 2; break; // fire a
@@ -597,12 +601,104 @@ bool MasterSystem::handleEvent(const SDL_Event& evt)
 
 
     }
+    
+    else if (evt.type == SDL_CONTROLLERBUTTONDOWN)
+    {
+        int player = 0;
+        int key = -1;
+        if (evt.cbutton.which == m_gameControllers[1].joystickID)
+        {
+            player = 1;
+        }
+        switch (evt.cbutton.button)
+        {
+        default: break;
+        case SDL_CONTROLLER_BUTTON_A:
+            key = player == 0 ? 4 : 2;
+            break;
+        case SDL_CONTROLLER_BUTTON_B:
+            key = player == 0 ? 5 : 3;
+            break; 
+        case SDL_CONTROLLER_BUTTON_START:
+            m_emulator->resetButton();
+            break;
+        case SDL_CONTROLLER_BUTTON_DPAD_UP:
+            key = player == 0 ? 0 : 6;
+            player = 0; //ports overlap so always player 0
+            break;
+        case SDL_CONTROLLER_BUTTON_DPAD_DOWN:
+            key = player == 0 ? 1 : 7;
+            player = 0;
+            break;
+        case SDL_CONTROLLER_BUTTON_DPAD_LEFT:
+            key = player == 0 ? 2 : 0;
+            break;
+        case SDL_CONTROLLER_BUTTON_DPAD_RIGHT:
+            key = player == 0 ? 3 : 1;
+            break;
+        }
+
+        if (key != -1)
+        {
+            m_emulator->setKeyPressed(player, key);
+        }
+    }
+    else if (evt.type == SDL_CONTROLLERBUTTONUP)
+    {
+        int player = 0;
+        int key = -1;
+        if (evt.cbutton.which == m_gameControllers[1].joystickID)
+        {
+            player = 1;
+        }
+        switch (evt.cbutton.button)
+        {
+        default: break;
+        case SDL_CONTROLLER_BUTTON_A:
+            key = player == 0 ? 4 : 2;
+            break;
+        case SDL_CONTROLLER_BUTTON_B:
+            key = player == 0 ? 5 : 3;
+            break;
+        case SDL_CONTROLLER_BUTTON_START:
+            key = 4; player = 1;
+            break;
+        case SDL_CONTROLLER_BUTTON_DPAD_UP:
+            key = player == 0 ? 0 : 6;
+            player = 0; //ports overlap so always player 0
+            break;
+        case SDL_CONTROLLER_BUTTON_DPAD_DOWN:
+            key = player == 0 ? 1 : 7;
+            player = 0;
+            break;
+        case SDL_CONTROLLER_BUTTON_DPAD_LEFT:
+            key = player == 0 ? 2 : 0;
+            break;
+        case SDL_CONTROLLER_BUTTON_DPAD_RIGHT:
+            key = player == 0 ? 3 : 1;
+            break;
+        }
+
+        if (key != -1)
+        {
+            m_emulator->setKeyReleased(player, key);
+        }
+    }
+    
     else if (evt.type == SDL_WINDOWEVENT)
     {
         if (evt.window.event == SDL_WINDOWEVENT_RESIZED)
         {
             //applyViewport();
         }
+    }
+    else if (evt.type == SDL_CONTROLLERDEVICEADDED)
+    {
+        addController(evt);
+    }
+    else if (evt.type == SDL_CONTROLLERDEVICEREMOVED)
+    {
+        removeController(evt);
     }
 
     return false;
@@ -1111,8 +1207,55 @@ void MasterSystem::saveSettings()
     cfg.save("settings.cfg");
 }
 
+void MasterSystem::addController(const SDL_Event& evt)
+{
+    auto id = evt.cdevice.which;
+
+    if (id < MaxControllers &&
+        SDL_IsGameController(id))
+    {
+        ControllerInfo ci;
+        ci.gameController = SDL_GameControllerOpen(id);
+        if (ci.gameController)
+        {
+            //the actual index is different to the id of the event
+            auto* j = SDL_GameControllerGetJoystick(ci.gameController);
+            ci.joystickID = SDL_JoystickInstanceID(j);
+
+            m_gameControllers[id] = ci;
+        }
+    }
+}
+
+void MasterSystem::removeController(const SDL_Event& evt)
+{
+    auto id = evt.cdevice.which;
+
+    std::int32_t controllerIndex = -1;
+    for (auto i = 0u; i < m_gameControllers.size(); ++i)
+    {
+        if (m_gameControllers[i].joystickID == id)
+        {
+            controllerIndex = i;
+            break;
+        }
+    }
+
+    if (controllerIndex > -1 &&
+        m_gameControllers[controllerIndex].gameController)
+    {
+        SDL_GameControllerClose(m_gameControllers[controllerIndex].gameController);
+        m_gameControllers[controllerIndex] = {};
+    }
+}
+
 void MasterSystem::shutdown()
 {
+    for (const auto& c : m_gameControllers)
+    {
+        SDL_GameControllerClose(c.gameController);
+    }
+
     if (m_vao)
     {
         glDeleteVertexArrays(1, &m_vao);
