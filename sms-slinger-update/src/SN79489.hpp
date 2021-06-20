@@ -40,11 +40,10 @@ public:
 
     SN79489();
 
-    void writeData(unsigned long int cycles, BYTE data);
+    void writeData(BYTE data);
     void reset();
-    void update(float cycles);
+    void update(int cycles);
     void audioCallback(std::uint8_t*, std::int32_t);
-    void dumpClockInfo();
 
     struct SampleBuffer final
     {
@@ -122,11 +121,11 @@ private:
     int m_latchedChannel;
     bool m_isToneLatched;
     mutable int m_currentBufferPos;
-    float m_cycles;
+
     WORD m_LFSR;
     unsigned long int m_clockInfo;
-    float m_bufferUpdateCount;
-    float m_updateBufferLimit;
+
+    std::int32_t m_incomingCycleCount;
 
     Sampler m_sampler;
     HiResTimer m_timer;

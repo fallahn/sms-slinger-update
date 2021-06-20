@@ -84,6 +84,8 @@ private:
     BYTE m_thirdBankPage;
     int m_currentRam;
 
+    int m_psgCount;
+
     bool isCodeMasters();
     void doMemPage(WORD address, BYTE data);
     void doMemPageCM(WORD address, BYTE data);

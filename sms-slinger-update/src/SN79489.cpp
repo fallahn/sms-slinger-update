@@ -49,14 +49,11 @@ SN79489::SN79489()
     m_latchedChannel    (Channel::Zero),
     m_isToneLatched     (false),
     m_currentBufferPos  (0),
-    m_cycles            (0.f),
     m_LFSR              (0),
     m_clockInfo         (0),
-    m_bufferUpdateCount (0.f),
-    m_updateBufferLimit (0.f),
-    m_sampler           (224000.0, 48000.0, 800)
+    m_incomingCycleCount(0),
+    m_sampler           (223500.0, 44100.0, 840) //measuring the timing says the actual speed is slightly less than 224000
 {
-    //constexpr int maxVolume = 4000; // there are 4 channels and the output is a signed 16 bit num giving a range of -32,000 + 32,000 so 4 * 8000 fits into the range
     constexpr float MaxVolume = 1.f / Channel::Count; //so that when all tones are playing we're never more than 1
     constexpr float TwodBScalingFactor = 0.79432823f; //each volume setting gets lower by 2 decibels
 
@@ -73,24 +70,10 @@ SN79489::SN79489()
     std::fill(m_mixerVolumes.begin(), m_mixerVolumes.end(), 0.5f);
 
     reset();
-
-    // strange calculation works out how many sound clock cycles is needed before we need to
-    // add a new element to the playback buffer.
-
-    // the amount of times that callback should request the buffer to be filled up in a second
-    constexpr float callbackFreq = (FREQUENCY / BUFFERSIZE) + 1;
-
-    // the clockSpeed of the sound chip is 3.3Mhz / 16
-    constexpr float clockSpeed = 220000.f;
-
-
-    float updateBufferLimit = clockSpeed / callbackFreq;
-    updateBufferLimit /= BUFFERSIZE; 
-    m_updateBufferLimit = updateBufferLimit;
 }
 
 //public
-void SN79489::writeData(unsigned long int cycles, BYTE data)
+void SN79489::writeData(BYTE data)
 {
     // if bit 7 is set the it updates the latch
     if (testBit(data, 7))
@@ -182,7 +165,6 @@ void SN79489::writeData(unsigned long int cycles, BYTE data)
 
 void SN79489::reset()
 {
-    m_bufferUpdateCount = 0;
     std::fill(m_buffer.begin(), m_buffer.end(), 0.f);
     std::fill(m_tones.begin(), m_tones.end(), 0);
     std::fill(m_counters.begin(), m_counters.end(), 0);
@@ -193,37 +175,33 @@ void SN79489::reset()
     m_latchedChannel = Channel::Zero;
     m_isToneLatched = true;
     m_currentBufferPos = 0;
-    m_cycles = 0;
+
     m_LFSR = 0x8000;
 }
 
-void SN79489::update(float cyclesMac)
+void SN79489::update(int cyclesMac)
 {
-    constexpr int sampleRate = 16;
-    cyclesMac /= sampleRate;
+    constexpr int sampleRate = 16; //sound chip runs 1/16 the update speed
 
-    m_cycles += cyclesMac;
+    m_incomingCycleCount += cyclesMac;
+    auto updateCount = m_incomingCycleCount / sampleRate;
+    m_incomingCycleCount %= sampleRate;
 
-    float floor = std::floor(m_cycles);
-    m_clockInfo += static_cast<unsigned long>(floor);
+#ifdef SMS_DEBUG
+    m_clockInfo += updateCount;
 
-    static float accum = 0.f;
-    accum += m_timer.restart();
-    while (accum > 1.f)
-    {
-        accum -= 1.f;
-        std::cout << m_clockInfo << std::endl;
-        m_clockInfo = 0;
-    }
-
-
-    m_cycles -= floor; 
-
-    m_bufferUpdateCount += floor;
-    
-
-    //for (auto l = 0; l < floor; ++l)
+    //static float accum = 0.f;
+    //accum += m_timer.restart();
+    //while (accum > 1.f)
     //{
+    //    accum -= 1.f;
+    //    std::cout << m_clockInfo << std::endl;
+    //    m_clockInfo = 0;
+    //}
+#endif
+
+    for (auto l = 0; l < updateCount; ++l)
+    {
         //tone channels
         float tone = 0.f;
 
@@ -234,7 +212,7 @@ void SN79489::update(float cyclesMac)
                 continue;
             }
 
-            m_counters[i] -= static_cast<int>(floor);
+            m_counters[i]--;
 
             if (m_counters[i] <= 0)
             {
@@ -248,7 +226,7 @@ void SN79489::update(float cyclesMac)
         //emulate noise
         if (m_tones[Tones::Noise] != 0)
         {
-            m_counters[Tones::Noise] -= static_cast<int>(floor);
+            m_counters[Tones::Noise]--;
 
             if (m_counters[Tones::Noise] <= 0)
             {
@@ -271,8 +249,7 @@ void SN79489::update(float cyclesMac)
                 m_polarity[Tones::Noise] *= -1;
 
                 //if the polarity changed from -1 to 1 then shift the random number
-                if (m_polarity[Tones::Noise] == 1
-                    /*&& oldPolarity != 1*/)
+                if (m_polarity[Tones::Noise] == 1)
                 {
                     bool isWhiteNoise = testBit(m_tones[Tones::Noise], 2);
 
@@ -293,20 +270,13 @@ void SN79489::update(float cyclesMac)
             tone += m_volumeTable[m_volume[Tones::Noise]] * (m_LFSR & 1) * m_mixerVolumes[MixerChannel::Noise];
         }
 
-        //m_sampler.push(tone);
-    //}
+        m_sampler.push(tone);
+    }
 
-    if (m_bufferUpdateCount >= m_updateBufferLimit)
-    //if (m_sampler.pending())
+    if (m_sampler.pending())
     {
-        //if (m_currentBufferPos < BUFFERSIZE)
-        {
-            m_buffer[m_currentBufferPos] = tone * m_mixerVolumes[MixerChannel::Master];
-            //m_buffer[m_currentBufferPos] = static_cast<float>(m_sampler.pop()) * m_mixerVolumes[MixerChannel::Master];
-        }
-            
-        m_currentBufferPos = (m_currentBufferPos + 1) % BUFFERSIZE;
-        m_bufferUpdateCount = m_updateBufferLimit - m_bufferUpdateCount;       
+        m_buffer[m_currentBufferPos] = static_cast<float>(m_sampler.pop()) * m_mixerVolumes[MixerChannel::Master];   
+        m_currentBufferPos = (m_currentBufferPos + 1) % BUFFERSIZE;      
     }       
 }
 
@@ -332,16 +302,6 @@ SN79489::SampleBuffer SN79489::getSamples() const
 void SN79489::setVolume(SN79489::MixerChannel::Label channel, float vol)
 {
     m_mixerVolumes[channel] = std::max(0.f, std::min(1.f, vol));
-}
-
-void SN79489::dumpClockInfo()
-{
-    char buffer[255];
-    std::memset(buffer, 0, sizeof(buffer));
-    sprintf(buffer, "Sound Chip Clock Cycles Per Second: %lu", m_clockInfo);
-    LogMessage::GetSingleton()->DoLogMessage(buffer, true);
-
-    m_clockInfo = 0;
 }
 
 //private

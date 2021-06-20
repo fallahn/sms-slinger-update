@@ -22,11 +22,15 @@ freely, subject to the following restrictions:
 3. This notice may not be removed or altered from any source distribution.
 
 
+###### Changes
 
 This repository contains the original source updated to SDL 2.0 from
-SDL 1.2, as well as some cross platform enhancements (remove MFC/ATL
+SDL 1.2, as well as some cross platform enhancements (removed MFC/ATL
 dependency on Windows, use dearImGui on all platforms, built in shader
-editor for post-process effects). Also minor bug fixes/improvements.
+editor for post-process effects). The sound emulation has also been
+updated to fix a bug in the noise channel, as well as tighten the cycle
+timing relative to the CPU emulation, which vastly improves (imo) the
+quality of the audio sync with the video.
 
 
 Ported to SDL2 2021 Matt Marchant

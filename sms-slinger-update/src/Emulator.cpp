@@ -67,7 +67,8 @@ Emulator::Emulator()
     m_firstBankPage     (0),
     m_secondBankPage    (0),
     m_thirdBankPage     (0),
-    m_currentRam        (0)
+    m_currentRam        (0),
+    m_psgCount          (2)
 {
     reset();
 }
@@ -203,13 +204,9 @@ void Emulator::insertCartridge(const char* path)
 
 void Emulator::update()
 {
-    unsigned long int targetCPU = MACHINE_CLICKS;
-    targetCPU /= m_FPS;
-
     m_cyclesThisUpdate = 0;
     m_graphicsChip.resetScreen();
     while (!m_graphicsChip.getRefresh())
-    //while (m_cyclesThisUpdate < targetCPU)
     { 
         int cycles = 0;
         if (m_Z80.GetContext()->m_Halted)
@@ -222,6 +219,11 @@ void Emulator::update()
         }
         checkInterupts();
         
+        //sound chip is 1/3 cycles so do this before scaling
+        m_soundChip.update(cycles);
+
+
+
         //http://www.smspower.org/forums/viewtopic.php?p=44198      
                 
         // convert from clock cycles to machine cycles
@@ -238,14 +240,8 @@ void Emulator::update()
         // graphics chips clock is half of that of the sms machine clock
         float vdpClock = static_cast<float>(cycles);
         vdpClock /= 2;
-        m_graphicsChip.update(vdpClock);
-
-        float soundCycles = static_cast<float>(cycles);
-        soundCycles /= CPU_CYCLES_TO_MACHINE_CLICKS;
-        m_soundChip.update(soundCycles);       
+        m_graphicsChip.update(vdpClock);      
     }
-
-    //TODO move vdp/sound updates here and only update for number of cycles as necessary
 }
 
 BYTE Emulator::readMemory(const WORD& address)
@@ -411,8 +407,8 @@ void Emulator::writeIOMemory(const BYTE& address, const BYTE& data)
 
     if ((address >=0x40) && (address < 0x80))
     {
-        // sound
-        m_soundChip.writeData(m_cyclesThisUpdate , data);
+        //sound
+        m_soundChip.writeData(data);
         return;
     }
 
