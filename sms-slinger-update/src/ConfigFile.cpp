@@ -529,7 +529,7 @@ bool ConfigObject::save(const std::string& path)
     out.file = SDL_RWFromFile(path.c_str(), "w");
     if (out.file)
     {
-        auto written = write(out.file);
+        /*auto written =*/ write(out.file);
         //Logger::log("Wrote " + std::to_string(written) + " bytes to " + path, Logger::Type::Info);
         return true;
     }

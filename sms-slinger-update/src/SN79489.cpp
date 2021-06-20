@@ -245,8 +245,6 @@ void SN79489::update(int cyclesMac)
                 }
 
                 m_counters[Tones::Noise] = count;
-
-                auto oldPolarity = m_polarity[Tones::Noise];
                 m_polarity[Tones::Noise] *= -1;
 
                 //if the polarity changed from -1 to 1 then shift the random number
@@ -262,7 +260,7 @@ void SN79489::update(int cyclesMac)
                     /*WORD tappedBits = bitGetVal(m_tones[Tones::Noise], 0);
                     tappedBits |= (bitGetVal(m_tones[Tones::Noise], 3) << 3);*/
 
-                    constexpr WORD tappedBits = 0x0009;
+                    static constexpr WORD tappedBits = 0x0009;
 
                     m_LFSR = (m_LFSR >> 1) | ((isWhiteNoise ? parity(m_LFSR & tappedBits) : (m_LFSR & 1)) << 15);
                 }

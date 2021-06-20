@@ -802,7 +802,7 @@ void MasterSystem::doImGui()
 
     if (m_showOptions)
     {
-        ImGui::SetNextWindowSize({ 340.f, 210.f });
+        ImGui::SetNextWindowSize({ 336.f, 214.f });
         ImGui::Begin("Options", &m_showOptions, ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoCollapse);
         ImGui::BeginTabBar("##0");
 
@@ -917,8 +917,14 @@ void MasterSystem::doImGui()
 
         if (ImGui::BeginTabItem("Input"))
         {
-            ImGui::Text("TODO: Key binds");
-            ImGui::Text("TODO: Controller input");
+            ImGui::Text("-=Player One=-\nButton 1: a\nButton 2: s\nReset: Backspace\nDPad: Arrow Keys         ");
+
+            ImGui::SameLine();
+            ImGui::Text("-=Player Two=-\nButton 1: KP7\nButton 2: KP9\nDPad: KP Arrow Keys");
+            
+            ImGui::NewLine();
+            ImGui::Text("-=Controller=-\nButton 1: A\nButton 2: B\nReset: Start\nDPad: DPad");
+
 
             ImGui::EndTabItem();
         }
