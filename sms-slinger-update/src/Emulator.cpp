@@ -67,8 +67,7 @@ Emulator::Emulator()
     m_firstBankPage     (0),
     m_secondBankPage    (0),
     m_thirdBankPage     (0),
-    m_currentRam        (0),
-    m_psgCount          (2)
+    m_currentRam        (0)
 {
     reset();
 }
@@ -238,9 +237,9 @@ void Emulator::update()
         m_clockInfo += cycles;
 
         // graphics chips clock is half of that of the sms machine clock
-        float vdpClock = static_cast<float>(cycles);
-        vdpClock /= 2;
-        m_graphicsChip.update(vdpClock);      
+        /*float vdpClock = static_cast<float>(cycles);
+        vdpClock /= 2;*/
+        m_graphicsChip.update(cycles);      
     }
 }
 

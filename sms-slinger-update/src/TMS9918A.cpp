@@ -63,9 +63,7 @@ bool TMS9918A::screenDisabled = true;
 bool TMS9918A::frameToggle = true;
 
 TMS9918A::TMS9918A()
-    : m_runningCycles       (0.f),
-    m_clockInfo             (0),
-    m_isPAL                 (true),
+    : m_isPAL               (false),
     m_numScanlines          (NUM_NTSC_VERTICAL),
     m_isVBlank              (false),
     m_status                (0),
@@ -82,14 +80,13 @@ TMS9918A::TMS9918A()
     m_readBuffer            (0),
     m_width                 (NUM_RES_HORIZONTAL),
     m_height                (NUM_RES_VERTICAL),
-    m_refresh               (false),
-    m_refreshRatePerSecond  (0)
+    m_refresh               (false)
 {
     reset(false);
 }
 
 //public
-void TMS9918A::update(float nextCycle)
+void TMS9918A::update(int cycles)
 {
     m_requestInterrupt = testBit(m_status, 7) && isRegBitSet(1, 5);
 
@@ -98,17 +95,8 @@ void TMS9918A::update(float nextCycle)
     m_isVBlank = false;
     m_refresh = false;
 
-    m_runningCycles += nextCycle;
 
-    int clockInfo = static_cast<int>(std::floor(m_runningCycles));
-
-    m_clockInfo += clockInfo;
-
-    // the hcounter moves on by the same number of
-    // machine cycles not the graphic cards clock cycle. The machine cycle is twice the speed of the vdp
-    int cycles = clockInfo * 2;
-
-    // are we moving off this scanline onto the next?
+    //are we moving off this scanline onto the next?
     if ((hcount + cycles) > MACHINE_CLICKS_PER_SCANLINE)
     {
         nextline = true;
@@ -116,15 +104,17 @@ void TMS9918A::update(float nextCycle)
 
     m_HCounter = (m_HCounter + cycles) % (MACHINE_CLICKS_PER_SCANLINE + 1);
 
+    //TODO this should only be updated half as often as the incoming number
+    //of cycles - although I can't see where they're actually counted?
+
     if (nextline)
     {
         BYTE vcount = m_VCounter;
         m_VCounter++;
 
-        // are we coming to the end of the vertical refresh?
+        //are we coming to the end of the vertical refresh?
         if (vcount == 255)
         {
-            m_refreshRatePerSecond++;
             m_VCounter = 0;
             m_VCounterFirst = true;
             
@@ -140,7 +130,7 @@ void TMS9918A::update(float nextCycle)
             m_VCounter = getVJumpTo();
         }
 
-        // are we just about to enter vertical refresh?
+        //are we just about to enter vertical refresh?
         else if (m_VCounter == m_height)
         {
             if (m_useGFXOpt)
@@ -153,7 +143,7 @@ void TMS9918A::update(float nextCycle)
 
         if (m_VCounter >= m_height)
         {
-            // do not reload the line interupt until we are past the FIRST line of the none active display period
+            //do not reload the line interupt until we are past the FIRST line of the none active display period
             if (m_VCounter != m_height)
             {
                 m_lineInterrupt = m_VDPRegisters[0xA];
@@ -164,21 +154,18 @@ void TMS9918A::update(float nextCycle)
             if (mode == 11)
             {
                 m_height = NUM_RES_VERT_MED;
-                //m_currentBuffer = m_screenMed.data();
             }
             else if (mode == 14)
             {
                 m_height = NUM_RES_VERT_HIGH;
-                //m_currentBuffer = m_screenHigh.data();
             }
             else
             {
                 m_height = NUM_RES_VERTICAL;
-                //m_currentBuffer = m_screenStandard.data();
             }
         }
 
-        // else if we are still drawing the screen then draw next scanline
+        //else if we are still drawing the screen then draw next scanline
         if (m_VCounter < m_height)
         {
             screenDisabled = !isRegBitSet(1, 6);
@@ -189,8 +176,8 @@ void TMS9918A::update(float nextCycle)
             }
         }
 
-        // decrement the line interupt counter during the active display period
-        // including the first line of the none active display period
+        //decrement the line interupt counter during the active display period
+        //including the first line of the none active display period
         if (m_VCounter <= m_height)
         {
             bool underflow = false;
@@ -200,7 +187,7 @@ void TMS9918A::update(float nextCycle)
             }
             m_lineInterrupt--;
 
-            // it is going to underflow
+            //it is going to underflow
             if (underflow)
             {
                 m_lineInterrupt = m_VDPRegisters[0xA];
@@ -215,15 +202,10 @@ void TMS9918A::update(float nextCycle)
     {
         m_requestInterrupt = true;
     }
-
-    m_runningCycles -= clockInfo;
 }
 
 void TMS9918A::reset(bool isPAL)
 {
-    m_refreshRatePerSecond = 0;
-    m_clockInfo = 0;
-
     std::fill(m_VRAM.begin(), m_VRAM.end(), 0);
     std::fill(m_CRAM.begin(), m_CRAM.end(), 0);
     std::fill(m_VDPRegisters.begin(), m_VDPRegisters.end(), 0);
@@ -250,7 +232,6 @@ void TMS9918A::reset(bool isPAL)
     m_numScanlines = m_isPAL ? NUM_PAL_VERTICAL : NUM_NTSC_VERTICAL;
 
     m_height = NUM_RES_VERTICAL;
-    m_runningCycles = 0;
 
     resetScreen();
 }
@@ -267,9 +248,6 @@ void TMS9918A::writeMemory(BYTE address, BYTE data)
 
 void TMS9918A::writeVDPAddress(BYTE data)
 {
-    //  char buffer[200];
-    //  sprintf(buffer, "Value before write is %x", GetAddressRegister());
-    //  LogMessage::GetSingleton()->DoLogMessage(buffer,false);
     if (m_isSecondControlWrite)
     {
         m_controlWord &= 0xFF;
@@ -393,17 +371,6 @@ bool TMS9918A::getRefresh()
         return true;
     }
     return false;
-}
-
-void TMS9918A::dumpClockInfo()
-{
-    char buffer[255];
-    std::memset(buffer, 0, sizeof(buffer));
-    sprintf(buffer, "Graphics Chip Clock Cycles Per Second: %lu There has been %d frames", m_clockInfo, m_refreshRatePerSecond);
-    LogMessage::GetSingleton()->DoLogMessage(buffer, true);
-
-    m_clockInfo = 0;
-    m_refreshRatePerSecond = 0;
 }
 
 //private
@@ -1046,9 +1013,9 @@ WORD TMS9918A::getNameBase() const
         switch (reg2)
         {
             case 0: return 0x700; break;
-            case 1: return 0x1700;break;
-            case 2: return 0x2700;break;
-            case 3: return 0x3700;break;
+            case 1: return 0x1700; break;
+            case 2: return 0x2700; break;
+            case 3: return 0x3700; break;
             default: assert(false); break;
         }
     }   
@@ -1072,10 +1039,10 @@ BYTE TMS9918A::getColourShade(BYTE val) const
 BYTE TMS9918A::getVDPMode() const
 {
     BYTE res = 0;
-    res |= bitGetVal(m_VDPRegisters[0x0],2) << 3;
-    res |= bitGetVal(m_VDPRegisters[0x1],3) << 2;
-    res |= bitGetVal(m_VDPRegisters[0x0],1) << 1;
-    res |= bitGetVal(m_VDPRegisters[0x1],4);
+    res |= bitGetVal(m_VDPRegisters[0x0], 2) << 3;
+    res |= bitGetVal(m_VDPRegisters[0x1], 3) << 2;
+    res |= bitGetVal(m_VDPRegisters[0x0], 1) << 1;
+    res |= bitGetVal(m_VDPRegisters[0x1], 4);
     return res;
 }
 

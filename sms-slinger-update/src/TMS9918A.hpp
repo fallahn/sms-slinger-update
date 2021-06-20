@@ -43,7 +43,7 @@ public:
 
     TMS9918A();
 
-    void update(float cycles);
+    void update(int cycles);
     void reset(bool isPAL);
     BYTE readMemory(BYTE address);
     void writeMemory(BYTE address, BYTE data);
@@ -58,7 +58,6 @@ public:
     WORD getWidth() const { return m_width; }
     WORD getHeight() const { return m_height; }
     bool getRefresh();
-    void dumpClockInfo();
     void setGFXOpt(bool useGFXOpt) { m_useGFXOpt = useGFXOpt; }
 
     const BYTE* getPixelBuffer() const { return m_buffer.data(); }
@@ -74,8 +73,6 @@ private:
     //we only need to make one buffer big enough to accept all modes
     std::array<BYTE, NUM_RES_VERT_HIGH * NUM_RES_HORIZONTAL * BYTES_PER_CHANNEL> m_buffer = {};
 
-    float m_runningCycles;
-    unsigned int long m_clockInfo;
     bool m_isPAL;
     int m_numScanlines;
     bool m_isVBlank;
@@ -96,7 +93,7 @@ private:
     WORD m_width;
     WORD m_height;
     bool m_refresh;
-    int m_refreshRatePerSecond;
+    //int m_refreshRatePerSecond;
     
 
     WORD getAddressRegister() const;

@@ -175,6 +175,7 @@ void SN79489::reset()
     m_latchedChannel = Channel::Zero;
     m_isToneLatched = true;
     m_currentBufferPos = 0;
+    m_incomingCycleCount = 0;
 
     m_LFSR = 0x8000;
 }
