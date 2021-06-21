@@ -85,6 +85,8 @@ void main()
         Cancel, Yes, No
     };
 
+    constexpr float UITimeout = 4.f;
+
     constexpr int WINDOW_WIDTH = TMS9918A::NUM_RES_HORIZONTAL;
     constexpr int WINDOW_HEIGHT = TMS9918A::NUM_RES_VERTICAL;
     bool fullScreen = false; //kludge to allow settings file to set this before window created.
@@ -107,7 +109,8 @@ MasterSystem::MasterSystem()
     m_showUI        (true),
     m_showOptions   (false),
     m_showEditor    (false),
-    m_running       (false)
+    m_running       (false),
+    m_uiTime        (0.f)
 {
     m_emulator = Emulator::createInstance();
 
@@ -464,6 +467,8 @@ void MasterSystem::romLoopFixedStep(int fps)
 
         auto [data, size] = m_emulator->getSoundChip().getSamples();
         SDL_QueueAudio(audioDevice, data, size);
+
+        uiTimeout();
     }
 
     shutdown();
@@ -486,6 +491,8 @@ void MasterSystem::romLoopFree()
 
         auto [data, size] = m_emulator->getSoundChip().getSamples();
         SDL_QueueAudio(audioDevice, data, size);
+
+        uiTimeout();
     }
 
     shutdown();
@@ -699,6 +706,16 @@ bool MasterSystem::handleEvent(const SDL_Event& evt)
     else if (evt.type == SDL_CONTROLLERDEVICEREMOVED)
     {
         removeController(evt);
+    }
+
+    else if (evt.type == SDL_MOUSEMOTION)
+    {
+        m_uiTime = 0.f;
+        if (!m_showUI)
+        {
+            m_showUI = true;
+            SDL_ShowCursor(1);
+        }
     }
 
     return false;
@@ -1139,6 +1156,23 @@ void MasterSystem::shaderEditor()
     if (!m_showEditor)
     {
         confirmationBox();
+    }
+}
+
+void MasterSystem::uiTimeout()
+{
+    if (m_showOptions || m_showEditor)
+    {
+        m_uiTime = 0.f;
+        return;
+    }
+
+    m_uiTime += m_uiTimer.restart();
+    if (m_uiTime > UITimeout
+        && m_showUI)
+    {
+        m_showUI = false;
+        SDL_ShowCursor(0);
     }
 }
 

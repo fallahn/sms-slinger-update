@@ -68,6 +68,8 @@ private:
     std::string m_currentShaderPath;
 
     HiResTimer m_updateTimer;
+    HiResTimer m_uiTimer;
+    float m_uiTime;
 
     struct ControllerInfo final
     {
@@ -99,6 +101,7 @@ private:
 
     void browseRom();
     void shaderEditor();
+    void uiTimeout();
 
     void loadSettings();
     void saveSettings();
